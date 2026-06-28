@@ -56,6 +56,13 @@ input {
   font-size: 28px;
 }
 
+.brand-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
 .eyebrow {
   margin: 0;
   color: var(--accent);

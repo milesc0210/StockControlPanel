@@ -30,6 +30,7 @@ const elements = {
   dateInput: document.getElementById('date-input'),
   dateNote: document.getElementById('date-note'),
   settingsButton: document.getElementById('settings-button'),
+  selfUpdateButton: document.getElementById('self-update-button'),
   settingsModal: document.getElementById('settings-modal'),
   settingsClose: document.getElementById('settings-close'),
   settingsForm: document.getElementById('settings-form'),
@@ -171,6 +172,37 @@ async function saveSettings(event) {
     setStatus(String(error.message || error), 'failed');
   } finally {
     elements.settingsSave.disabled = false;
+  }
+}
+
+async function runSelfUpdate() {
+  const confirmed = window.confirm('即將從 GitHub 更新這個程式。更新完成後需要手動重新啟動，是否繼續？');
+  if (!confirmed) return;
+
+  elements.selfUpdateButton.disabled = true;
+  setStatus('更新中...', 'running');
+
+  try {
+    const response = await fetch('/api/self_update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || '自動更新失敗');
+    }
+
+    setStatus(payload.updated ? '更新完成，請重啟' : '目前已是最新版本', 'success');
+    if (payload.updated) {
+      window.alert('更新完成，請先關閉程式，再重新啟動。');
+    } else {
+      window.alert('目前已是最新版本。');
+    }
+  } catch (error) {
+    setStatus(String(error.message || error), 'failed');
+    window.alert(String(error.message || error));
+  } finally {
+    elements.selfUpdateButton.disabled = false;
   }
 }
 
@@ -1482,6 +1514,7 @@ async function init() {
   elements.refreshFutureButton.addEventListener('click', refreshFuture);
   elements.runButton.addEventListener('click', runSelectedFunction);
   elements.settingsButton.addEventListener('click', openSettingsModal);
+  elements.selfUpdateButton.addEventListener('click', runSelfUpdate);
   elements.settingsClose.addEventListener('click', closeSettingsModal);
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.settingsModal.querySelector('.settings-modal-backdrop').addEventListener('click', closeSettingsModal);

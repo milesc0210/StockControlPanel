@@ -1296,8 +1296,69 @@ def write_settings_payload(finmind_token: str | None, fugle_intraday_api_key: st
     return read_settings_payload()
 
 
+def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        cwd=MILES_AGENT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+        timeout=timeout,
+    )
+
+
+def update_project_from_github() -> dict[str, Any]:
+    git_dir = MILES_AGENT_ROOT / ".git"
+    if not git_dir.exists():
+        raise RuntimeError("目前資料夾不是 git 專案，無法自動更新。")
+
+    status_result = run_command(["git", "status", "--porcelain"])
+    if status_result.returncode != 0:
+        raise RuntimeError(status_result.stderr.strip() or status_result.stdout.strip() or "無法檢查 git 狀態。")
+    if status_result.stdout.strip():
+        raise RuntimeError("目前有未提交的本機修改，請先提交或備份後再更新。")
+
+    branch_result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    if branch_result.returncode != 0:
+        raise RuntimeError(branch_result.stderr.strip() or branch_result.stdout.strip() or "無法取得目前分支。")
+    branch = branch_result.stdout.strip() or "main"
+
+    pull_result = run_command(["git", "pull", "--ff-only", "origin", branch], timeout=600)
+    pull_output = "\n".join(part for part in [pull_result.stdout.strip(), pull_result.stderr.strip()] if part).strip()
+    if pull_result.returncode != 0:
+        raise RuntimeError(pull_output or "git pull 失敗。")
+
+    updated = "Already up to date." not in pull_output and "Already up-to-date." not in pull_output
+    changed_files: list[str] = []
+    if updated:
+        changed_result = run_command(["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"])
+        if changed_result.returncode == 0:
+            changed_files = [line.strip() for line in changed_result.stdout.splitlines() if line.strip()]
+
+    requirements_updated = any(Path(path).name == "requirements.txt" for path in changed_files)
+    pip_output = ""
+    if requirements_updated:
+        pip_result = run_command([PYTHON_BIN, "-m", "pip", "install", "-r", "requirements.txt"], timeout=1200)
+        pip_output = "\n".join(part for part in [pip_result.stdout.strip(), pip_result.stderr.strip()] if part).strip()
+        if pip_result.returncode != 0:
+            raise RuntimeError(pip_output or "requirements 安裝失敗。")
+
+    return {
+        "ok": True,
+        "updated": updated,
+        "branch": branch,
+        "changed_files": changed_files,
+        "requirements_updated": requirements_updated,
+        "restart_required": updated,
+        "pull_output": pull_output,
+        "pip_output": pip_output,
+        "message": "更新完成，請關閉並重新啟動程式。" if updated else "目前已是最新版本。",
+    }
+
 
 def resolve_finmind_token() -> str:
+
     return get_secret_value("FINMIND_TOKEN")
 
 def format_finmind_date(result_date: str) -> str:
@@ -1680,6 +1741,15 @@ def api_settings() -> Any:
         fugle_intraday_api_key=payload.get("fugle_intraday_api_key"),
     )
     return jsonify({"ok": True, "settings": settings})
+
+
+@app.route("/api/self_update", methods=["POST"])
+def api_self_update() -> Any:
+    try:
+        result = update_project_from_github()
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify(result)
 
 
 @app.route("/api/fear_greed")
