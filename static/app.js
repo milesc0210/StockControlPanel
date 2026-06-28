@@ -8,6 +8,7 @@ const state = {
   currentKlineCode: '',
   fearGreed: null,
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
+  selfUpdateProgressTimer: null,
 };
 
 const KLINE_MODAL_CACHE_MAX_ENTRIES = 120;
@@ -31,6 +32,8 @@ const elements = {
   dateNote: document.getElementById('date-note'),
   settingsButton: document.getElementById('settings-button'),
   selfUpdateButton: document.getElementById('self-update-button'),
+  selfUpdateProgress: document.getElementById('self-update-progress'),
+  selfUpdateProgressText: document.getElementById('self-update-progress-text'),
   settingsModal: document.getElementById('settings-modal'),
   settingsClose: document.getElementById('settings-close'),
   settingsForm: document.getElementById('settings-form'),
@@ -50,6 +53,38 @@ const elements = {
 function setStatus(text, tone = 'neutral') {
   elements.statusPill.textContent = text;
   elements.statusPill.className = `status-pill ${tone}`;
+}
+
+function startSelfUpdateProgress() {
+  const steps = ['準備檢查版本...', '正在連線 GitHub...', '正在下載更新...', '正在套用更新...'];
+  let index = 0;
+  elements.selfUpdateProgress.classList.remove('hidden');
+  elements.selfUpdateProgress.setAttribute('aria-hidden', 'false');
+  elements.selfUpdateProgressText.textContent = steps[0];
+  if (state.selfUpdateProgressTimer) {
+    clearInterval(state.selfUpdateProgressTimer);
+  }
+  state.selfUpdateProgressTimer = window.setInterval(() => {
+    index = (index + 1) % steps.length;
+    elements.selfUpdateProgressText.textContent = steps[index];
+  }, 1400);
+}
+
+function stopSelfUpdateProgress(finalText = '') {
+  if (state.selfUpdateProgressTimer) {
+    clearInterval(state.selfUpdateProgressTimer);
+    state.selfUpdateProgressTimer = null;
+  }
+  if (finalText) {
+    elements.selfUpdateProgressText.textContent = finalText;
+    window.setTimeout(() => {
+      elements.selfUpdateProgress.classList.add('hidden');
+      elements.selfUpdateProgress.setAttribute('aria-hidden', 'true');
+    }, 900);
+    return;
+  }
+  elements.selfUpdateProgress.classList.add('hidden');
+  elements.selfUpdateProgress.setAttribute('aria-hidden', 'true');
 }
 
 function statusTone(status) {
@@ -181,6 +216,7 @@ async function runSelfUpdate() {
 
   elements.selfUpdateButton.disabled = true;
   setStatus('更新中...', 'running');
+  startSelfUpdateProgress();
 
   try {
     const response = await fetch('/api/self_update', {
@@ -193,6 +229,7 @@ async function runSelfUpdate() {
     }
 
     setStatus(payload.updated ? '更新完成，請重啟' : '目前已是最新版本', 'success');
+    stopSelfUpdateProgress(payload.updated ? '更新完成' : '已是最新版本');
     if (payload.updated) {
       window.alert('更新完成，請先關閉程式，再重新啟動。');
     } else {
@@ -200,6 +237,7 @@ async function runSelfUpdate() {
     }
   } catch (error) {
     setStatus(String(error.message || error), 'failed');
+    stopSelfUpdateProgress('更新失敗');
     window.alert(String(error.message || error));
   } finally {
     elements.selfUpdateButton.disabled = false;
