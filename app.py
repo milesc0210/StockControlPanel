@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -35,7 +36,19 @@ PYTHON_BIN = sys.executable
 GITHUB_REPO_OWNER = "milesc0210"
 GITHUB_REPO_NAME = "StockControlPanel"
 GITHUB_ZIP_URL = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/archive/refs/heads/main.zip"
+GITHUB_RAW_BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main"
 LOCAL_PRESERVE_NAMES = {".env", "stock_control_panel.db", ".git", ".venv", "Release"}
+UPDATE_TRACKED_PATHS = [
+    "app.py",
+    "requirements.txt",
+    "start_stock_control_panel.bat",
+    "templates/index.html",
+    "static/app.js",
+    "static/style.css",
+    "scripts/fetch_klines.py",
+    "scripts/pre_breakout_screen.py",
+    "scripts/twse_tpex_fetch.py",
+]
 
 
 def _strip_env_value(value: str) -> str:
@@ -1315,6 +1328,68 @@ def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedP
     )
 
 
+def build_local_update_signature() -> str:
+    digest = hashlib.sha256()
+    for relative_path in UPDATE_TRACKED_PATHS:
+        file_path = MILES_AGENT_ROOT / relative_path
+        if not file_path.exists():
+            digest.update(f"missing:{relative_path}\n".encode("utf-8"))
+            continue
+        digest.update(f"file:{relative_path}\n".encode("utf-8"))
+        digest.update(file_path.read_bytes())
+    return digest.hexdigest()
+
+
+def build_remote_update_signature() -> str:
+    digest = hashlib.sha256()
+    for relative_path in UPDATE_TRACKED_PATHS:
+        url = f"{GITHUB_RAW_BASE_URL}/{relative_path}"
+        request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            remote_bytes = response.read()
+        digest.update(f"file:{relative_path}\n".encode("utf-8"))
+        digest.update(remote_bytes)
+    return digest.hexdigest()
+
+
+def get_update_status() -> dict[str, Any]:
+    git_dir = MILES_AGENT_ROOT / ".git"
+    if git_dir.exists():
+        branch_result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        if branch_result.returncode != 0:
+            raise RuntimeError(branch_result.stderr.strip() or branch_result.stdout.strip() or "無法取得目前分支。")
+        branch = branch_result.stdout.strip() or "main"
+
+        local_result = run_command(["git", "rev-parse", "HEAD"])
+        remote_result = run_command(["git", "ls-remote", "origin", f"refs/heads/{branch}"])
+        if local_result.returncode != 0 or remote_result.returncode != 0:
+            raise RuntimeError("無法檢查 GitHub 最新版本。")
+
+        local_rev = local_result.stdout.strip()
+        remote_rev = (remote_result.stdout.strip().split()[0] if remote_result.stdout.strip() else "")
+        update_available = bool(local_rev and remote_rev and local_rev != remote_rev)
+        return {
+            "ok": True,
+            "mode": "git",
+            "branch": branch,
+            "update_available": update_available,
+            "button_label": "一鍵更新" if update_available else "已是最新版",
+            "button_enabled": update_available,
+        }
+
+    local_signature = build_local_update_signature()
+    remote_signature = build_remote_update_signature()
+    update_available = local_signature != remote_signature
+    return {
+        "ok": True,
+        "mode": "zip",
+        "branch": "main",
+        "update_available": update_available,
+        "button_label": "一鍵更新" if update_available else "已是最新版",
+        "button_enabled": update_available,
+    }
+
+
 def update_project_from_git() -> dict[str, Any]:
     status_result = run_command(["git", "status", "--porcelain"])
     if status_result.returncode != 0:
@@ -1812,6 +1887,15 @@ def api_settings() -> Any:
 def api_self_update() -> Any:
     try:
         result = update_project_from_github()
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify(result)
+
+
+@app.route("/api/update_status")
+def api_update_status() -> Any:
+    try:
+        result = get_update_status()
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify(result)

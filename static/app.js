@@ -9,6 +9,7 @@ const state = {
   fearGreed: null,
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
   selfUpdateProgressTimer: null,
+  updateStatusChecked: false,
 };
 
 const KLINE_MODAL_CACHE_MAX_ENTRIES = 120;
@@ -85,6 +86,33 @@ function stopSelfUpdateProgress(finalText = '') {
   }
   elements.selfUpdateProgress.classList.add('hidden');
   elements.selfUpdateProgress.setAttribute('aria-hidden', 'true');
+}
+
+function applyUpdateButtonState(payload, fallbackText = '一鍵更新') {
+  const buttonLabel = payload?.button_label || fallbackText;
+  const buttonEnabled = Boolean(payload?.button_enabled);
+  elements.selfUpdateButton.textContent = buttonLabel;
+  elements.selfUpdateButton.disabled = !buttonEnabled;
+  elements.selfUpdateButton.title = buttonEnabled ? '從 GitHub 更新目前程式' : '目前已是最新版本';
+  state.updateStatusChecked = true;
+}
+
+async function checkUpdateStatus() {
+  elements.selfUpdateButton.textContent = '檢查更新中';
+  elements.selfUpdateButton.disabled = true;
+  elements.selfUpdateButton.title = '背景檢查是否有新版本';
+  try {
+    const response = await fetch('/api/update_status');
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || '檢查更新失敗');
+    }
+    applyUpdateButtonState(payload);
+  } catch (error) {
+    elements.selfUpdateButton.textContent = '一鍵更新';
+    elements.selfUpdateButton.disabled = false;
+    elements.selfUpdateButton.title = String(error.message || error);
+  }
 }
 
 function statusTone(status) {
@@ -211,10 +239,12 @@ async function saveSettings(event) {
 }
 
 async function runSelfUpdate() {
+  if (elements.selfUpdateButton.disabled && state.updateStatusChecked) return;
   const confirmed = window.confirm('即將從 GitHub 更新這個程式。更新完成後需要手動重新啟動，是否繼續？');
   if (!confirmed) return;
 
   elements.selfUpdateButton.disabled = true;
+  elements.selfUpdateButton.textContent = '更新中';
   setStatus('更新中...', 'running');
   startSelfUpdateProgress();
 
@@ -230,6 +260,10 @@ async function runSelfUpdate() {
 
     setStatus(payload.updated ? '更新完成，請重啟' : '目前已是最新版本', 'success');
     stopSelfUpdateProgress(payload.updated ? '更新完成' : '已是最新版本');
+    applyUpdateButtonState({
+      button_label: payload.updated ? '請重新啟動' : '已是最新版',
+      button_enabled: false,
+    }, payload.updated ? '請重新啟動' : '已是最新版');
     if (payload.updated) {
       window.alert('更新完成，請先關閉程式，再重新啟動。');
     } else {
@@ -238,9 +272,10 @@ async function runSelfUpdate() {
   } catch (error) {
     setStatus(String(error.message || error), 'failed');
     stopSelfUpdateProgress('更新失敗');
-    window.alert(String(error.message || error));
-  } finally {
+    elements.selfUpdateButton.textContent = '一鍵更新';
     elements.selfUpdateButton.disabled = false;
+    elements.selfUpdateButton.title = '從 GitHub 更新目前程式';
+    window.alert(String(error.message || error));
   }
 }
 
@@ -1545,6 +1580,7 @@ async function init() {
 
   renderDateOptions();
   renderActionButtons();
+  checkUpdateStatus();
 
   elements.refreshButton.addEventListener('click', refreshCurrentView);
   elements.institutionalButton.addEventListener('click', runInstitutional);
