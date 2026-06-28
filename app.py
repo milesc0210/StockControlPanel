@@ -4,13 +4,16 @@ import base64
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
 import urllib.request
+import zipfile
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass
@@ -29,6 +32,10 @@ OUTPUT_ROOT = BASE_DIR / "outputs"
 DB_PATH = BASE_DIR / "stock_control_panel.db"
 ENV_FILE_PATH = BASE_DIR / ".env"
 PYTHON_BIN = sys.executable
+GITHUB_REPO_OWNER = "milesc0210"
+GITHUB_REPO_NAME = "StockControlPanel"
+GITHUB_ZIP_URL = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/archive/refs/heads/main.zip"
+LOCAL_PRESERVE_NAMES = {".env", "stock_control_panel.db", ".git", ".venv", "Release"}
 
 
 def _strip_env_value(value: str) -> str:
@@ -1308,11 +1315,7 @@ def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedP
     )
 
 
-def update_project_from_github() -> dict[str, Any]:
-    git_dir = MILES_AGENT_ROOT / ".git"
-    if not git_dir.exists():
-        raise RuntimeError("目前資料夾不是 git 專案，無法自動更新。")
-
+def update_project_from_git() -> dict[str, Any]:
     status_result = run_command(["git", "status", "--porcelain"])
     if status_result.returncode != 0:
         raise RuntimeError(status_result.stderr.strip() or status_result.stdout.strip() or "無法檢查 git 狀態。")
@@ -1346,6 +1349,7 @@ def update_project_from_github() -> dict[str, Any]:
 
     return {
         "ok": True,
+        "mode": "git",
         "updated": updated,
         "branch": branch,
         "changed_files": changed_files,
@@ -1355,6 +1359,67 @@ def update_project_from_github() -> dict[str, Any]:
         "pip_output": pip_output,
         "message": "更新完成，請關閉並重新啟動程式。" if updated else "目前已是最新版本。",
     }
+
+
+def update_project_from_zip() -> dict[str, Any]:
+    requirements_before = (MILES_AGENT_ROOT / "requirements.txt").read_text(encoding="utf-8", errors="ignore") if (MILES_AGENT_ROOT / "requirements.txt").exists() else ""
+
+    with tempfile.TemporaryDirectory(prefix="stockcontrolpanel-update-") as tmpdir:
+        tmp_root = Path(tmpdir)
+        zip_path = tmp_root / "update.zip"
+        urllib.request.urlretrieve(GITHUB_ZIP_URL, zip_path)
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            archive.extractall(tmp_root)
+
+        extracted_dirs = [path for path in tmp_root.iterdir() if path.is_dir() and path.name.startswith(f"{GITHUB_REPO_NAME}-")]
+        if not extracted_dirs:
+            raise RuntimeError("找不到下載後的更新內容。")
+        source_root = extracted_dirs[0]
+
+        changed_files: list[str] = []
+        for source_path in source_root.rglob("*"):
+            relative = source_path.relative_to(source_root)
+            if not relative.parts:
+                continue
+            if relative.parts[0] in LOCAL_PRESERVE_NAMES:
+                continue
+            destination_path = MILES_AGENT_ROOT / relative
+            if source_path.is_dir():
+                destination_path.mkdir(parents=True, exist_ok=True)
+                continue
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            if not destination_path.exists() or destination_path.read_bytes() != source_path.read_bytes():
+                changed_files.append(relative.as_posix())
+            shutil.copy2(source_path, destination_path)
+
+    requirements_after = (MILES_AGENT_ROOT / "requirements.txt").read_text(encoding="utf-8", errors="ignore") if (MILES_AGENT_ROOT / "requirements.txt").exists() else ""
+    requirements_updated = requirements_before != requirements_after
+    pip_output = ""
+    if requirements_updated:
+        pip_result = run_command([PYTHON_BIN, "-m", "pip", "install", "-r", "requirements.txt"], timeout=1200)
+        pip_output = "\n".join(part for part in [pip_result.stdout.strip(), pip_result.stderr.strip()] if part).strip()
+        if pip_result.returncode != 0:
+            raise RuntimeError(pip_output or "requirements 安裝失敗。")
+
+    return {
+        "ok": True,
+        "mode": "zip",
+        "updated": True,
+        "branch": "main",
+        "changed_files": changed_files,
+        "requirements_updated": requirements_updated,
+        "restart_required": True,
+        "pull_output": "已從 GitHub 下載 ZIP 並覆蓋本機檔案。",
+        "pip_output": pip_output,
+        "message": "更新完成，請關閉並重新啟動程式。",
+    }
+
+
+def update_project_from_github() -> dict[str, Any]:
+    git_dir = MILES_AGENT_ROOT / ".git"
+    if git_dir.exists():
+        return update_project_from_git()
+    return update_project_from_zip()
 
 
 def resolve_finmind_token() -> str:
