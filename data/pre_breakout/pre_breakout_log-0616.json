@@ -1,0 +1,232 @@
+{
+  "date": "20260616",
+  "generated": "20260616",
+  "candidates": [
+    {
+      "code": "1785",
+      "name": "光洋科",
+      "market": "TPEX",
+      "close": 142.5,
+      "pct": -2.06,
+      "vol": 12789,
+      "ma5": 139.6,
+      "ma10": 139.05,
+      "dist_ma5": 2.08,
+      "range_pct": 11.49,
+      "up_days": 3,
+      "vol_ratio": 0.66,
+      "avg_vol_10": 19408,
+      "institutional": {
+        "外商": 496.0,
+        "投信": 0.3,
+        "自營": -60.1,
+        "合計": 436.3
+      },
+      "grade": "C"
+    },
+    {
+      "code": "4721",
+      "name": "美琪瑪",
+      "market": "TPEX",
+      "close": 98.5,
+      "pct": -2.48,
+      "vol": 10306,
+      "ma5": 94.52,
+      "ma10": 91.5,
+      "dist_ma5": 4.21,
+      "range_pct": 15.69,
+      "up_days": 3,
+      "vol_ratio": 4.51,
+      "avg_vol_10": 2286,
+      "institutional": {
+        "外商": 1447.5,
+        "投信": 0.0,
+        "自營": 95.7,
+        "合計": 1543.2
+      },
+      "grade": "C"
+    },
+    {
+      "code": "5498",
+      "name": "凱崴",
+      "market": "TPEX",
+      "close": 66.2,
+      "pct": -2.36,
+      "vol": 5884,
+      "ma5": 65.58,
+      "ma10": 63.42,
+      "dist_ma5": 0.95,
+      "range_pct": 20.49,
+      "up_days": 4,
+      "vol_ratio": 0.65,
+      "avg_vol_10": 8997,
+      "institutional": {
+        "外商": 69.0,
+        "投信": 0.0,
+        "自營": -8.0,
+        "合計": 61.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6156",
+      "name": "松上",
+      "market": "TPEX",
+      "close": 22.9,
+      "pct": 1.33,
+      "vol": 5761,
+      "ma5": 20.21,
+      "ma10": 19.75,
+      "dist_ma5": 13.31,
+      "range_pct": 21.51,
+      "up_days": 4,
+      "vol_ratio": 3.79,
+      "avg_vol_10": 1519,
+      "institutional": {
+        "外商": -379.6,
+        "投信": 0.0,
+        "自營": 11.6,
+        "合計": -368.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "5410",
+      "name": "國眾",
+      "market": "TPEX",
+      "close": 46.2,
+      "pct": -3.75,
+      "vol": 3057,
+      "ma5": 43.64,
+      "ma10": 41.9,
+      "dist_ma5": 5.87,
+      "range_pct": 22.29,
+      "up_days": 4,
+      "vol_ratio": 1.09,
+      "avg_vol_10": 2794,
+      "institutional": {
+        "外商": -3.0,
+        "投信": 0.0,
+        "自營": 0.2,
+        "合計": -2.8
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6187",
+      "name": "萬潤",
+      "market": "TPEX",
+      "close": 1140.0,
+      "pct": 0.88,
+      "vol": 2611,
+      "ma5": 1088.0,
+      "ma10": 1083.0,
+      "dist_ma5": 4.78,
+      "range_pct": 11.88,
+      "up_days": 4,
+      "vol_ratio": 0.89,
+      "avg_vol_10": 2933,
+      "institutional": {
+        "外商": -272.3,
+        "投信": 134.0,
+        "自營": 69.1,
+        "合計": -69.2
+      },
+      "grade": "C"
+    },
+    {
+      "code": "4541",
+      "name": "晟田",
+      "market": "TPEX",
+      "close": 48.0,
+      "pct": -2.04,
+      "vol": 1836,
+      "ma5": 47.44,
+      "ma10": 47.13,
+      "dist_ma5": 1.18,
+      "range_pct": 6.87,
+      "up_days": 4,
+      "vol_ratio": 1.64,
+      "avg_vol_10": 1118,
+      "institutional": {
+        "外商": 140.5,
+        "投信": 0.0,
+        "自營": 3.0,
+        "合計": 143.5
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3360",
+      "name": "尚立",
+      "market": "TPEX",
+      "close": 15.3,
+      "pct": 0.66,
+      "vol": 1519,
+      "ma5": 14.77,
+      "ma10": 14.68,
+      "dist_ma5": 3.59,
+      "range_pct": 6.67,
+      "up_days": 4,
+      "vol_ratio": 2.41,
+      "avg_vol_10": 631,
+      "institutional": {
+        "外商": 437.7,
+        "投信": 0.0,
+        "自營": -0.1,
+        "合計": 437.6
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3484",
+      "name": "崧騰",
+      "market": "TPEX",
+      "close": 47.55,
+      "pct": 1.17,
+      "vol": 1103,
+      "ma5": 45.83,
+      "ma10": 45.23,
+      "dist_ma5": 3.75,
+      "range_pct": 7.18,
+      "up_days": 3,
+      "vol_ratio": 2.6,
+      "avg_vol_10": 424,
+      "institutional": {
+        "外商": 283.6,
+        "投信": 0.0,
+        "自營": 0.0,
+        "合計": 283.6
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3083",
+      "name": "網龍",
+      "market": "TPEX",
+      "close": 29.4,
+      "pct": 2.08,
+      "vol": 1091,
+      "ma5": 29.08,
+      "ma10": 28.72,
+      "dist_ma5": 1.1,
+      "range_pct": 10.49,
+      "up_days": 2,
+      "vol_ratio": 2.37,
+      "avg_vol_10": 461,
+      "institutional": {
+        "外商": -52.0,
+        "投信": 0.0,
+        "自營": 0.6,
+        "合計": -51.4
+      },
+      "grade": "C"
+    }
+  ],
+  "total": 10,
+  "market_summary": {
+    "limit_up_count": 28,
+    "market_mood": " 適中",
+    "tpex_pct_pass": true
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "date": "20260602",
+  "generated": "20260602",
+  "candidates": [
+    {
+      "code": "2504",
+      "name": "國產",
+      "close": 35.2,
+      "pct": -0.3,
+      "vol": 3748,
+      "ma5": 34.95,
+      "ma10": 34.88,
+      "dist_ma5": 0.72,
+      "range_pct": 2.9,
+      "up_days": 0,
+      "vol_ratio": 1.52,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 1.0,
+        "外商": 0.0,
+        "合計": 1.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "2204",
+      "name": "中華",
+      "close": 54.0,
+      "pct": -0.4,
+      "vol": 3003,
+      "ma5": 53.38,
+      "ma10": 53.02,
+      "dist_ma5": 1.16,
+      "range_pct": 3.8,
+      "up_days": 0,
+      "vol_ratio": 1.68,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -192.4,
+        "自營": 0.0,
+        "外商": 0.0,
+        "合計": -192.4
+      },
+      "grade": "A"
+    },
+    {
+      "code": "2646",
+      "name": "星宇航空",
+      "close": 20.9,
+      "pct": -0.2,
+      "vol": 9998,
+      "ma5": 20.43,
+      "ma10": 20.35,
+      "dist_ma5": 2.3,
+      "range_pct": 4.2,
+      "up_days": 0,
+      "vol_ratio": 1.26,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 1.0,
+        "自營": 0.0,
+        "外商": 0.0,
+        "合計": 1.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "5608",
+      "name": "四維航",
+      "close": 14.75,
+      "pct": -0.25,
+      "vol": 2428,
+      "ma5": 14.57,
+      "ma10": 14.45,
+      "dist_ma5": 1.24,
+      "range_pct": 5.6,
+      "up_days": 0,
+      "vol_ratio": 1.21,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 6.0,
+        "外商": 0.0,
+        "合計": 6.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "2886",
+      "name": "兆豐金",
+      "close": 41.7,
+      "pct": -0.25,
+      "vol": 69614,
+      "ma5": 40.48,
+      "ma10": 40.28,
+      "dist_ma5": 3.01,
+      "range_pct": 5.8,
+      "up_days": 0,
+      "vol_ratio": 1.3,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 14140.1,
+        "自營": -85.1,
+        "外商": 0.0,
+        "合計": 14055.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "4306",
+      "name": "炎洲",
+      "close": 14.45,
+      "pct": -0.2,
+      "vol": 2404,
+      "ma5": 14.08,
+      "ma10": 13.95,
+      "dist_ma5": 2.63,
+      "range_pct": 5.9,
+      "up_days": 0,
+      "vol_ratio": 1.32,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 28.0,
+        "外商": 0.0,
+        "合計": 28.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "6443",
+      "name": "元晶",
+      "close": 42.55,
+      "pct": -0.45,
+      "vol": 31209,
+      "ma5": 41.37,
+      "ma10": 41.12,
+      "dist_ma5": 2.85,
+      "range_pct": 6.2,
+      "up_days": 0,
+      "vol_ratio": 1.32,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 208.0,
+        "外商": 0.0,
+        "合計": 208.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "2890",
+      "name": "永豐金",
+      "close": 31.0,
+      "pct": -0.55,
+      "vol": 53360,
+      "ma5": 30.12,
+      "ma10": 29.89,
+      "dist_ma5": 2.92,
+      "range_pct": 6.5,
+      "up_days": 0,
+      "vol_ratio": 1.34,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 149.7,
+        "自營": -83.8,
+        "外商": 0.0,
+        "合計": 65.9
+      },
+      "grade": "A"
+    }
+  ],
+  "total": 8
+}

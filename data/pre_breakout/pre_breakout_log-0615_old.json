@@ -1,0 +1,138 @@
+{
+  "date": "20260612",
+  "generated": "20260612",
+  "next_trading_day": "0615",
+  "market_summary": {
+    "limit_up_count": 29,
+    "market_mood": "適中"
+  },
+  "total": 7,
+  "candidates": [
+    {
+      "code": "4721",
+      "name": "美琪瑪",
+      "close": 92.0,
+      "pct": 0.44,
+      "vol": 1616,
+      "range_pct": 8.25,
+      "up_days": 2,
+      "dist_ma5": 1.01,
+      "grade": "B",
+      "market": "TPEX",
+      "institutional": {
+        "外商": -93.8,
+        "投信": 0.0,
+        "自營": -57.8,
+        "合計": -151.6
+      }
+    },
+    {
+      "code": "5328",
+      "name": "華容",
+      "close": 42.35,
+      "pct": -1.97,
+      "vol": 39766,
+      "range_pct": 19.6,
+      "up_days": 3,
+      "dist_ma5": 0.64,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": -1980.8,
+        "投信": 0.0,
+        "自營": 4.8,
+        "合計": -1975.9
+      }
+    },
+    {
+      "code": "6174",
+      "name": "安碁",
+      "close": 50.3,
+      "pct": -2.71,
+      "vol": 12087,
+      "range_pct": 18.31,
+      "up_days": 4,
+      "dist_ma5": 6.64,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": 1879.0,
+        "投信": 0.0,
+        "自營": 12.4,
+        "合計": 1891.4
+      }
+    },
+    {
+      "code": "3357",
+      "name": "臺慶科",
+      "close": 293.0,
+      "pct": 2.09,
+      "vol": 11122,
+      "range_pct": 10.17,
+      "up_days": 2,
+      "dist_ma5": 0.38,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": -2233.9,
+        "投信": 95.0,
+        "自營": -28.8,
+        "合計": -2167.7
+      }
+    },
+    {
+      "code": "5410",
+      "name": "國眾",
+      "close": 45.65,
+      "pct": 3.4,
+      "vol": 6921,
+      "range_pct": 12.48,
+      "up_days": 2,
+      "dist_ma5": 11.97,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": 1703.8,
+        "投信": 0.0,
+        "自營": -67.2,
+        "合計": 1636.6
+      }
+    },
+    {
+      "code": "4973",
+      "name": "廣穎",
+      "close": 191.0,
+      "pct": -0.26,
+      "vol": 2169,
+      "range_pct": 23.32,
+      "up_days": 4,
+      "dist_ma5": 7.06,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": -23.1,
+        "投信": 0.0,
+        "自營": -8.1,
+        "合計": -31.2
+      }
+    },
+    {
+      "code": "6180",
+      "name": "橘子",
+      "close": 44.6,
+      "pct": -1.44,
+      "vol": 1465,
+      "range_pct": 15.32,
+      "up_days": 3,
+      "dist_ma5": 0.13,
+      "grade": "C",
+      "market": "TPEX",
+      "institutional": {
+        "外商": -787.8,
+        "投信": 0.0,
+        "自營": -5.3,
+        "合計": -793.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>選股功能控制台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <p class="eyebrow">Stock Control Panel</p>
+        <h1>選股功能控制台</h1>
+        <p class="subtitle">點功能鍵直接執行，結果自動保存到資料庫。</p>
+        <button id="settings-button" class="text-button sidebar-settings-button">Token 設定</button>
+      </div>
+      <div id="function-groups" class="function-groups"></div>
+    </aside>
+
+    <main class="content">
+      <section class="hero-card">
+        <div>
+          <p class="eyebrow">目前選擇</p>
+          <h2 id="function-title">漲停紅箭</h2>
+          <p id="function-description" class="description"></p>
+        </div>
+        <div class="hero-actions">
+          <div id="date-control-wrap" class="date-control-wrap">
+            <label class="date-control">
+              <span>執行日期</span>
+              <input id="date-input" class="date-input" type="date">
+            </label>
+            <div id="date-note" class="date-note">可選擇的日期：2026/2 開始的交易日</div>
+          </div>
+          <button id="run-button" class="primary-button" hidden>立即執行</button>
+          <span id="status-pill" class="status-pill neutral">待命</span>
+        </div>
+      </section>
+
+      <section class="panel-grid single-column">
+        <article class="panel-card">
+          <div class="panel-header">
+            <h3>結果</h3>
+            <div class="panel-header-actions">
+              <button id="institutional-button" class="text-button institutional-btn" hidden>跑法人</button>
+              <button id="intraday-button" class="text-button intraday-btn" hidden>即時行情</button>
+              <button id="refresh-future-button" class="text-button refresh-future-btn" title="跳過快取，強制重新執行這個日期的選股">強制重跑</button>
+              <button id="refresh-button" class="text-button">重新整理</button>
+            </div>
+          </div>
+          <div id="latest-meta" class="meta-list"></div>
+          <div id="latest-output" class="output-box empty">請先從左側點選功能。</div>
+          <div id="artifact-list" class="artifact-list"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="settings-modal" class="settings-modal hidden" aria-hidden="true">
+    <div class="settings-modal-backdrop"></div>
+    <section class="settings-modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+      <div class="settings-modal-header">
+        <div>
+          <p class="eyebrow">使用者設定</p>
+          <h3 id="settings-modal-title">API Token 設定</h3>
+          <p id="settings-meta" class="settings-meta">設定會寫入 \StockControlPanel\.env</p>
+        </div>
+        <button id="settings-close" class="text-button">關閉</button>
+      </div>
+      <form id="settings-form" class="settings-form">
+        <label class="settings-field">
+          <span>FinMind Token</span>
+          <input id="finmind-token-input" type="password" autocomplete="off" placeholder="請輸入 FinMind Token">
+          <small id="finmind-token-hint" class="settings-hint">未設定</small>
+          <small class="settings-hint">申請網址：<a href="https://finmindtrade.com/analysis/#/account/login" target="_blank" rel="noopener noreferrer">https://finmindtrade.com/analysis/#/account/login</a></small>
+        </label>
+        <label class="settings-field">
+          <span>Fugle Intraday API Key</span>
+          <input id="fugle-token-input" type="password" autocomplete="off" placeholder="請輸入 Fugle API Key">
+          <small id="fugle-token-hint" class="settings-hint">未設定</small>
+          <small class="settings-hint">申請網址：<a href="https://developer.fugle.tw/docs/key" target="_blank" rel="noopener noreferrer">https://developer.fugle.tw/docs/key</a></small>
+        </label>
+        <div class="settings-actions">
+          <button id="settings-save" type="submit" class="primary-button">儲存設定</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="kline-modal" class="kline-modal hidden" aria-hidden="true">
+    <div class="kline-modal-backdrop"></div>
+    <section class="kline-modal-card" role="dialog" aria-modal="true" aria-labelledby="kline-modal-title">
+      <div class="kline-modal-header">
+        <div>
+          <p class="eyebrow">K 線圖</p>
+          <h3 id="kline-modal-title">60 日 K 線圖</h3>
+          <p id="kline-modal-meta" class="kline-modal-meta"></p>
+        </div>
+        <button id="kline-modal-close" class="text-button">關閉</button>
+      </div>
+      <div id="kline-modal-body" class="kline-modal-body">載入中...</div>
+    </section>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

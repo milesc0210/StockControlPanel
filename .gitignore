@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local secrets
+.env
+
+# Local runtime data
+stock_control_panel.db
+*.db
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Packaged duplicate / local release artifacts
+Release/
+
+# Build / temp artifacts
+*.log

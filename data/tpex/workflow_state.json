@@ -1,0 +1,10 @@
+{
+  "status": "in_progress",
+  "tasks": {
+    "T1": {"status": "completed", "result": "6147 頎邦，一週全有交易"},
+    "T2": {"status": "pending"},
+    "T3": {"status": "pending"},
+    "T4": {"status": "pending"}
+  },
+  "external_retry": {}
+}

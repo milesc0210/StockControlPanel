@@ -1,0 +1,2129 @@
+{
+  "date": "2026-06-05",
+  "source": "local_market_loader (結構分析: 本地68天歷史)",
+  "total_candidates": 12,
+  "pool": [
+    {
+      "code": "2645",
+      "name": "長榮航太",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            169.0,
+            164.0,
+            162.0,
+            157.5,
+            148.0
+          ],
+          "resistances": [
+            174.5
+          ],
+          "rr": 10.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            169.0,
+            164.0,
+            162.0,
+            157.5,
+            148.0
+          ],
+          "resistances": [
+            174.5
+          ],
+          "rr": 10.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            169.0,
+            164.0,
+            162.0,
+            158.5,
+            157.5
+          ],
+          "resistances": [
+            174.5
+          ],
+          "rr": 10.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3003",
+      "name": "健和興",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "十字線"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            62.5,
+            59.2,
+            56.6,
+            56.3
+          ],
+          "resistances": [
+            66.7
+          ],
+          "rr": 9.5,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            62.5,
+            59.2,
+            57.1,
+            56.3,
+            52.1
+          ],
+          "resistances": [
+            66.7
+          ],
+          "rr": 9.5,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            62.5,
+            59.2,
+            57.1,
+            56.3,
+            52.5
+          ],
+          "resistances": [
+            66.7
+          ],
+          "rr": 9.5,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "2609",
+      "name": "陽明",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            53.9,
+            51.2,
+            51.0,
+            49.1,
+            47.35
+          ],
+          "resistances": [
+            55.7
+          ],
+          "rr": 2.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            53.9,
+            51.9,
+            51.2,
+            49.05,
+            47.35
+          ],
+          "resistances": [
+            55.7
+          ],
+          "rr": 2.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            53.9,
+            51.9,
+            51.2,
+            49.05,
+            47.35
+          ],
+          "resistances": [
+            55.7,
+            62.9
+          ],
+          "rr": 2.0,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "2379",
+      "name": "瑞昱",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            615.0,
+            580.0,
+            524.0
+          ],
+          "resistances": [
+            689.0
+          ],
+          "rr": 1.64,
+          "patterns": [],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            615.0,
+            580.0,
+            575.0,
+            524.0,
+            500.0
+          ],
+          "resistances": [
+            689.0
+          ],
+          "rr": 1.64,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            615.0,
+            580.0,
+            575.0,
+            524.0,
+            500.0
+          ],
+          "resistances": [
+            689.0
+          ],
+          "rr": 1.64,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3033",
+      "name": "威健",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引黑"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            48.05,
+            45.5
+          ],
+          "resistances": [
+            55.3
+          ],
+          "rr": 0.93,
+          "patterns": [],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            48.05,
+            45.5,
+            36.7,
+            35.5,
+            34.0
+          ],
+          "resistances": [
+            55.3
+          ],
+          "rr": 0.93,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            48.05,
+            45.5,
+            38.45,
+            36.7,
+            35.5
+          ],
+          "resistances": [
+            55.3
+          ],
+          "rr": 0.93,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "6189",
+      "name": "豐藝",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            52.1,
+            49.7,
+            49.6,
+            47.45
+          ],
+          "resistances": [
+            56.2
+          ],
+          "rr": 0.86,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            52.1,
+            49.6,
+            49.6,
+            46.7,
+            45.45
+          ],
+          "resistances": [
+            56.2
+          ],
+          "rr": 0.86,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            52.1,
+            49.6,
+            49.6,
+            47.95,
+            46.7
+          ],
+          "resistances": [
+            56.2
+          ],
+          "rr": 0.86,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3607",
+      "name": "谷崧",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            15.0,
+            14.15
+          ],
+          "resistances": [
+            19.55
+          ],
+          "rr": 0.78,
+          "patterns": [],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            16.0,
+            15.5,
+            15.0,
+            14.15
+          ],
+          "resistances": [
+            19.55
+          ],
+          "rr": 1.29,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            16.0,
+            15.5,
+            14.8,
+            14.15
+          ],
+          "resistances": [
+            19.55
+          ],
+          "rr": 1.29,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3550",
+      "name": "聯穎",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "十字線"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            22.3,
+            19.7
+          ],
+          "resistances": [
+            24.5
+          ],
+          "rr": 0.26,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            22.3,
+            19.45,
+            18.1
+          ],
+          "resistances": [
+            24.5
+          ],
+          "rr": 0.26,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            21.8,
+            20.35,
+            19.45,
+            18.1,
+            16.9
+          ],
+          "resistances": [
+            24.5
+          ],
+          "rr": 0.2,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3704",
+      "name": "合勤控",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "十字線"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            36.4,
+            34.75,
+            33.2
+          ],
+          "resistances": [
+            50.0
+          ],
+          "rr": 0.2,
+          "patterns": [
+            "W底"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            38.65,
+            36.4,
+            34.75,
+            33.2
+          ],
+          "resistances": [
+            50.0
+          ],
+          "rr": 0.25,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            38.65,
+            36.4,
+            35.4,
+            34.75,
+            34.15
+          ],
+          "resistances": [
+            50.0
+          ],
+          "rr": 0.25,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "3071",
+      "name": "協禧",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "十字線"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            31.3,
+            31.25,
+            30.4,
+            29.1,
+            28.05
+          ],
+          "resistances": [
+            34.25,
+            36.2
+          ],
+          "rr": 0.2,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            31.8,
+            31.25,
+            30.4,
+            29.6,
+            28.05
+          ],
+          "resistances": [
+            34.25,
+            35.5
+          ],
+          "rr": 0.26,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            32.65,
+            31.25,
+            31.0,
+            29.6,
+            28.05
+          ],
+          "resistances": [
+            34.25,
+            35.5
+          ],
+          "rr": 0.45,
+          "patterns": [
+            "W底",
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "6206",
+      "name": "飛捷",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            136.0,
+            126.0
+          ],
+          "resistances": [
+            142.5
+          ],
+          "rr": 0.18,
+          "patterns": [],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            136.0,
+            126.0,
+            101.0
+          ],
+          "resistances": [
+            142.5
+          ],
+          "rr": 0.18,
+          "patterns": [],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            136.0,
+            126.0,
+            108.0,
+            101.0,
+            98.5
+          ],
+          "resistances": [
+            142.5
+          ],
+          "rr": 0.18,
+          "patterns": [
+            "W底"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    },
+    {
+      "code": "4155",
+      "name": "訊映",
+      "days": 1,
+      "added_date": "2026-06-05",
+      "last_signal_date": "2026-06-05",
+      "snapshots": [
+        {
+          "date": "2026-06-05",
+          "shape": "上下引紅"
+        }
+      ],
+      "structure": {
+        "window_5": {
+          "supports": [
+            14.85,
+            14.35,
+            13.45
+          ],
+          "resistances": [
+            15.5
+          ],
+          "rr": 0.08,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_10": {
+          "supports": [
+            14.85,
+            14.35,
+            13.95,
+            13.55,
+            13.0
+          ],
+          "resistances": [
+            15.5
+          ],
+          "rr": 0.08,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        },
+        "window_20": {
+          "supports": [
+            14.85,
+            14.35,
+            13.55,
+            13.1
+          ],
+          "resistances": [
+            15.5
+          ],
+          "rr": 0.08,
+          "patterns": [
+            "疑似M頭（未跌破頸線）"
+          ],
+          "volume_signals": []
+        }
+      },
+      "volume_signals": []
+    }
+  ],
+  "kicked_log": [
+    {
+      "code": "2812",
+      "name": "台中銀",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.9% / 一月=-1.8%（資金流出，不進場）"
+    },
+    {
+      "code": "3033",
+      "name": "威健",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-0.2% / 一月=+17.9%（資金流出，不進場）"
+    },
+    {
+      "code": "3701",
+      "name": "大眾控",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+11.2% / 一月=-9.3%（資金流出，不進場）"
+    },
+    {
+      "code": "4142",
+      "name": "國光生",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.0% / 一月=-0.8%（資金流出，不進場）"
+    },
+    {
+      "code": "7827",
+      "name": "漢康-KY創",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+0.0% / 一月=+0.0%（資金流出，不進場）"
+    },
+    {
+      "code": "4128",
+      "name": "中天",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.2% / 一月=-1.9%（資金流出，不進場）"
+    },
+    {
+      "code": "4743",
+      "name": "合一",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.0% / 一月=-7.2%（資金流出，不進場）"
+    },
+    {
+      "code": "8383",
+      "name": "千附",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.3% / 一月=-4.2%（資金流出，不進場）"
+    },
+    {
+      "code": "4532",
+      "name": "瑞智",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5512",
+      "name": "力麒",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1307",
+      "name": "三芳",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "8112",
+      "name": "至上",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6270",
+      "name": "倍微",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4167",
+      "name": "松瑞藥",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2031",
+      "name": "新光鋼",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2731",
+      "name": "雄獅",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5452",
+      "name": "佶優",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1342",
+      "name": "八貫",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1434",
+      "name": "福懋",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3290",
+      "name": "東浦",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1210",
+      "name": "大成",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2204",
+      "name": "中華",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3265",
+      "name": "台星科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "9917",
+      "name": "中保科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "9919",
+      "name": "康那香",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2022",
+      "name": "聚亨",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5871",
+      "name": "中租-KY",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2845",
+      "name": "遠東銀",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2801",
+      "name": "彰銀",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2892",
+      "name": "第一金",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "death_cross: MA5=28.38 < MA20=28.48"
+    },
+    {
+      "code": "2812",
+      "name": "台中銀",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.9% / 一月=-1.8%（資金流出，不進場）"
+    },
+    {
+      "code": "3033",
+      "name": "威健",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-0.2% / 一月=+17.9%（資金流出，不進場）"
+    },
+    {
+      "code": "3701",
+      "name": "大眾控",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+11.2% / 一月=-9.3%（資金流出，不進場）"
+    },
+    {
+      "code": "4142",
+      "name": "國光生",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.0% / 一月=-0.8%（資金流出，不進場）"
+    },
+    {
+      "code": "7827",
+      "name": "漢康-KY創",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+0.0% / 一月=+0.0%（資金流出，不進場）"
+    },
+    {
+      "code": "4128",
+      "name": "中天",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.2% / 一月=-1.9%（資金流出，不進場）"
+    },
+    {
+      "code": "4743",
+      "name": "合一",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.0% / 一月=-7.2%（資金流出，不進場）"
+    },
+    {
+      "code": "8383",
+      "name": "千附",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.3% / 一月=-4.2%（資金流出，不進場）"
+    },
+    {
+      "code": "4532",
+      "name": "瑞智",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5512",
+      "name": "力麒",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1307",
+      "name": "三芳",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "8112",
+      "name": "至上",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6270",
+      "name": "倍微",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4167",
+      "name": "松瑞藥",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2031",
+      "name": "新光鋼",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2731",
+      "name": "雄獅",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5452",
+      "name": "佶優",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1342",
+      "name": "八貫",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1434",
+      "name": "福懋",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3290",
+      "name": "東浦",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1210",
+      "name": "大成",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2204",
+      "name": "中華",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3265",
+      "name": "台星科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "9917",
+      "name": "中保科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "9919",
+      "name": "康那香",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2022",
+      "name": "聚亨",
+      "reason": "sector_tilt: 航運 板塊配額已滿（26選8）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5871",
+      "name": "中租-KY",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2845",
+      "name": "遠東銀",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2801",
+      "name": "彰銀",
+      "reason": "sector_tilt: 航運 板塊配額已滿（10選7）",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2892",
+      "name": "第一金",
+      "kicked_date": "2026-06-04",
+      "days_in_pool": 1,
+      "reason": "death_cross: MA5=28.38 < MA20=28.48"
+    },
+    {
+      "code": "2421",
+      "name": "建準",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "未通過當日篩選"
+    },
+    {
+      "code": "3028",
+      "name": "增你強",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "未通過當日篩選"
+    },
+    {
+      "code": "2103",
+      "name": "台橡",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "未通過當日篩選"
+    },
+    {
+      "code": "1215",
+      "name": "卜蜂",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-4.8% / 一月=-13.8%（資金流出，不進場）"
+    },
+    {
+      "code": "1717",
+      "name": "長興",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-4.7% / 一月=-2.9%（資金流出，不進場）"
+    },
+    {
+      "code": "1727",
+      "name": "中華化",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.1% / 一月=+18.9%（資金流出，不進場）"
+    },
+    {
+      "code": "2034",
+      "name": "允強",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+2.0% / 一月=-4.9%（資金流出，不進場）"
+    },
+    {
+      "code": "2367",
+      "name": "燿華",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-7.3% / 一月=+2.8%（資金流出，不進場）"
+    },
+    {
+      "code": "2383",
+      "name": "台光電",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-4.6% / 一月=-1.5%（資金流出，不進場）"
+    },
+    {
+      "code": "2485",
+      "name": "兆赫",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-9.0% / 一月=-0.3%（資金流出，不進場）"
+    },
+    {
+      "code": "2530",
+      "name": "華建",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.8% / 一月=-7.3%（資金流出，不進場）"
+    },
+    {
+      "code": "2536",
+      "name": "宏普",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.6% / 一月=-1.2%（資金流出，不進場）"
+    },
+    {
+      "code": "2537",
+      "name": "聯上發",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+7.4% / 一月=-3.3%（資金流出，不進場）"
+    },
+    {
+      "code": "2612",
+      "name": "中航",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-0.5% / 一月=-2.0%（資金流出，不進場）"
+    },
+    {
+      "code": "2614",
+      "name": "東森",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.9% / 一月=-4.7%（資金流出，不進場）"
+    },
+    {
+      "code": "2634",
+      "name": "漢翔",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.0% / 一月=-6.0%（資金流出，不進場）"
+    },
+    {
+      "code": "3014",
+      "name": "聯陽",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.3% / 一月=+15.6%（資金流出，不進場）"
+    },
+    {
+      "code": "3019",
+      "name": "亞光",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 2,
+      "reason": "weak_momentum: 一週=-1.0% / 一月=+6.6%（資金流出，不進場）"
+    },
+    {
+      "code": "3356",
+      "name": "奇偶",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-3.0% / 一月=+7.7%（資金流出，不進場）"
+    },
+    {
+      "code": "3645",
+      "name": "達邁",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-3.8% / 一月=+5.7%（資金流出，不進場）"
+    },
+    {
+      "code": "3665",
+      "name": "貿聯-KY",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.5% / 一月=-20.9%（資金流出，不進場）"
+    },
+    {
+      "code": "3714",
+      "name": "富采",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-3.6% / 一月=-1.7%（資金流出，不進場）"
+    },
+    {
+      "code": "4142",
+      "name": "國光生",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.1% / 一月=-0.6%（資金流出，不進場）"
+    },
+    {
+      "code": "4571",
+      "name": "鈞興-KY",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-12.2% / 一月=-1.3%（資金流出，不進場）"
+    },
+    {
+      "code": "5234",
+      "name": "達興材料",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.3% / 一月=+1.2%（資金流出，不進場）"
+    },
+    {
+      "code": "5519",
+      "name": "隆大",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.9% / 一月=-1.4%（資金流出，不進場）"
+    },
+    {
+      "code": "5534",
+      "name": "長虹",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.5% / 一月=-1.5%（資金流出，不進場）"
+    },
+    {
+      "code": "5608",
+      "name": "四維航",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+4.9% / 一月=-3.2%（資金流出，不進場）"
+    },
+    {
+      "code": "6165",
+      "name": "浪凡",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+1.8% / 一月=-4.0%（資金流出，不進場）"
+    },
+    {
+      "code": "6177",
+      "name": "達麗",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+7.2% / 一月=-1.1%（資金流出，不進場）"
+    },
+    {
+      "code": "6196",
+      "name": "帆宣",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.4% / 一月=+28.2%（資金流出，不進場）"
+    },
+    {
+      "code": "6215",
+      "name": "和椿",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-7.5% / 一月=+4.9%（資金流出，不進場）"
+    },
+    {
+      "code": "6472",
+      "name": "保瑞",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+7.4% / 一月=-10.3%（資金流出，不進場）"
+    },
+    {
+      "code": "6525",
+      "name": "捷敏-KY",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.6% / 一月=+10.5%（資金流出，不進場）"
+    },
+    {
+      "code": "6668",
+      "name": "中揚光",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.4% / 一月=+2.1%（資金流出，不進場）"
+    },
+    {
+      "code": "6719",
+      "name": "力智",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-3.4% / 一月=+26.9%（資金流出，不進場）"
+    },
+    {
+      "code": "6757",
+      "name": "台灣虎航",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-4.1% / 一月=-1.4%（資金流出，不進場）"
+    },
+    {
+      "code": "6835",
+      "name": "圓裕",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.4% / 一月=+2.8%（資金流出，不進場）"
+    },
+    {
+      "code": "6944",
+      "name": "兆聯實業",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-0.7% / 一月=-4.7%（資金流出，不進場）"
+    },
+    {
+      "code": "7711",
+      "name": "永擎",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-2.4% / 一月=-16.6%（資金流出，不進場）"
+    },
+    {
+      "code": "7780",
+      "name": "大研生醫*",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+3.1% / 一月=-3.2%（資金流出，不進場）"
+    },
+    {
+      "code": "7786",
+      "name": "東方風能",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+5.5% / 一月=-9.1%（資金流出，不進場）"
+    },
+    {
+      "code": "3162",
+      "name": "精確",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.8% / 一月=-13.2%（資金流出，不進場）"
+    },
+    {
+      "code": "3188",
+      "name": "鑫龍騰",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+6.0% / 一月=-3.5%（資金流出，不進場）"
+    },
+    {
+      "code": "3379",
+      "name": "彬台",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-2.5% / 一月=+3.9%（資金流出，不進場）"
+    },
+    {
+      "code": "4157",
+      "name": "太景*-KY",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+0.7% / 一月=-6.2%（資金流出，不進場）"
+    },
+    {
+      "code": "5291",
+      "name": "邑昇",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-5.6% / 一月=+5.9%（資金流出，不進場）"
+    },
+    {
+      "code": "5498",
+      "name": "凱崴",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-6.1% / 一月=-17.2%（資金流出，不進場）"
+    },
+    {
+      "code": "6187",
+      "name": "萬潤",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+0.0% / 一月=-0.9%（資金流出，不進場）"
+    },
+    {
+      "code": "6279",
+      "name": "胡連",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.6% / 一月=-2.8%（資金流出，不進場）"
+    },
+    {
+      "code": "6469",
+      "name": "大樹",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+6.0% / 一月=-2.5%（資金流出，不進場）"
+    },
+    {
+      "code": "6841",
+      "name": "長佳智能",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+9.0% / 一月=-1.1%（資金流出，不進場）"
+    },
+    {
+      "code": "8054",
+      "name": "安國",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-1.9% / 一月=-6.1%（資金流出，不進場）"
+    },
+    {
+      "code": "8147",
+      "name": "正淩",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=-6.2% / 一月=+5.1%（資金流出，不進場）"
+    },
+    {
+      "code": "8927",
+      "name": "北基",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "weak_momentum: 一週=+7.0% / 一月=-2.9%（資金流出，不進場）"
+    },
+    {
+      "code": "5512",
+      "name": "力麒",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2915",
+      "name": "潤泰全",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "8932",
+      "name": "智通*",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5607",
+      "name": "遠雄港",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4167",
+      "name": "松瑞藥",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2031",
+      "name": "新光鋼",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1342",
+      "name": "八貫",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2069",
+      "name": "運錩",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4137",
+      "name": "麗豐-KY",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3290",
+      "name": "東浦",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "5493",
+      "name": "三聯",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2727",
+      "name": "王品",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "7721",
+      "name": "微程式",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1110",
+      "name": "東泥",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2903",
+      "name": "遠百",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "8996",
+      "name": "高力",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1210",
+      "name": "大成",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6024",
+      "name": "群益期",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2204",
+      "name": "中華",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1231",
+      "name": "聯華食",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "1598",
+      "name": "岱宇",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4513",
+      "name": "福裕",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3289",
+      "name": "宜特",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "4123",
+      "name": "晟德",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6219",
+      "name": "富旺",
+      "reason": "sector_tilt: 航運 板塊配額已滿（37選12）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3716",
+      "name": "中化控股",
+      "reason": "sector_tilt: 航運 板塊配額已滿（14選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6104",
+      "name": "創惟",
+      "reason": "sector_tilt: 航運 板塊配額已滿（14選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "6191",
+      "name": "精成科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（14選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2520",
+      "name": "冠德",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3004",
+      "name": "豐達科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3630",
+      "name": "新鉅科",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3023",
+      "name": "信邦",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3447",
+      "name": "展達",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2504",
+      "name": "國產",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3022",
+      "name": "威強電",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2501",
+      "name": "國建",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2547",
+      "name": "日勝生",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "3303",
+      "name": "岱稜",
+      "reason": "sector_tilt: 航運 板塊配額已滿（21選11）",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 0
+    },
+    {
+      "code": "2462",
+      "name": "良得電",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "2442",
+      "name": "新美齊",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2882",
+      "name": "國泰金",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "2885",
+      "name": "元大金",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "2838",
+      "name": "聯邦銀",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "1710",
+      "name": "東聯",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "1762",
+      "name": "中化生",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "1722",
+      "name": "台肥",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "8390",
+      "name": "金益鼎",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "5536",
+      "name": "聖暉*",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "5353",
+      "name": "台林",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "8121",
+      "name": "越峰",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "6209",
+      "name": "今國光",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2108",
+      "name": "南帝",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "1533",
+      "name": "車王電",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "9933",
+      "name": "中鼎",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "9939",
+      "name": "宏全",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "9958",
+      "name": "世紀鋼",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "6585",
+      "name": "鼎基",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "4953",
+      "name": "緯軟",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "6669",
+      "name": "緯穎",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "6121",
+      "name": "新普",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "6152",
+      "name": "百一",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "6180",
+      "name": "橘子",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "6761",
+      "name": "穩得",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "6776",
+      "name": "展碁國際",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "3703",
+      "name": "欣陸",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "3504",
+      "name": "揚明光",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2597",
+      "name": "潤弘",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "3596",
+      "name": "智易",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2543",
+      "name": "皇昌",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "2535",
+      "name": "達欣工",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "3689",
+      "name": "湧德",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2615",
+      "name": "萬海",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2606",
+      "name": "裕民",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    },
+    {
+      "code": "2637",
+      "name": "慧洋-KY",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "low_rr: RR=0.00"
+    },
+    {
+      "code": "2611",
+      "name": "志信",
+      "kicked_date": "2026-06-05",
+      "days_in_pool": 1,
+      "reason": "pattern_veto: M頭型態（上方套牢賣壓過重）"
+    }
+  ]
+}

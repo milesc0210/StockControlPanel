@@ -1,0 +1,285 @@
+{
+  "date": "20260603",
+  "generated": "20260603",
+  "candidates": [
+    {
+      "code": "2027",
+      "name": "大成鋼",
+      "close": 43.85,
+      "pct": 0.46,
+      "vol": 35447,
+      "ma5": 42.54,
+      "ma10": 41.95,
+      "dist_ma5": 3.08,
+      "range_pct": 9.12,
+      "up_days": 3,
+      "vol_ratio": 1.2,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -8447.0,
+        "自營": 470.0,
+        "外商": 0.0,
+        "合計": -7977.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6443",
+      "name": "元晶",
+      "close": 42.9,
+      "pct": 0.82,
+      "vol": 31630,
+      "ma5": 41.37,
+      "ma10": 41.12,
+      "dist_ma5": 3.7,
+      "range_pct": 6.24,
+      "up_days": 3,
+      "vol_ratio": 1.18,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 1087.0,
+        "外商": 0.0,
+        "合計": 1087.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "5371",
+      "name": "中光電",
+      "close": 75.1,
+      "pct": 1.62,
+      "vol": 5085,
+      "ma5": 72.4,
+      "ma10": 72.23,
+      "dist_ma5": 3.73,
+      "range_pct": 5.42,
+      "up_days": 3,
+      "vol_ratio": 1.03,
+      "market": "TPEX",
+      "institutional": {
+        "投信": 300.0,
+        "自營": 289.5,
+        "外商": 0.0,
+        "合計": 589.5
+      },
+      "grade": "C"
+    },
+    {
+      "code": "2610",
+      "name": "華航",
+      "close": 19.95,
+      "pct": 2.31,
+      "vol": 55672,
+      "ma5": 19.04,
+      "ma10": 18.77,
+      "dist_ma5": 4.78,
+      "range_pct": 7.42,
+      "up_days": 3,
+      "vol_ratio": 0.82,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 295.1,
+        "自營": 80.0,
+        "外商": 0.0,
+        "合計": 375.1
+      },
+      "grade": "C"
+    },
+    {
+      "code": "1101",
+      "name": "台泥",
+      "close": 24.85,
+      "pct": 0.81,
+      "vol": 45323,
+      "ma5": 24.22,
+      "ma10": 24.17,
+      "dist_ma5": 2.6,
+      "range_pct": 4.23,
+      "up_days": 3,
+      "vol_ratio": 1.46,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 41.0,
+        "自營": -298.0,
+        "外商": 0.0,
+        "合計": -257.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6191",
+      "name": "精成科",
+      "close": 100.5,
+      "pct": 3.61,
+      "vol": 15277,
+      "ma5": 97.06,
+      "ma10": 96.08,
+      "dist_ma5": 3.54,
+      "range_pct": 5.6,
+      "up_days": 3,
+      "vol_ratio": 1.99,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 293.0,
+        "自營": 2.0,
+        "外商": 0.0,
+        "合計": 295.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "9907",
+      "name": "統一實",
+      "close": 16.75,
+      "pct": 2.45,
+      "vol": 5255,
+      "ma5": 16.03,
+      "ma10": 15.99,
+      "dist_ma5": 4.49,
+      "range_pct": 3.48,
+      "up_days": 3,
+      "vol_ratio": 1.43,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -256.6,
+        "自營": 9.0,
+        "外商": 0.0,
+        "合計": -247.6
+      },
+      "grade": "C"
+    },
+    {
+      "code": "2504",
+      "name": "國產",
+      "close": 35.9,
+      "pct": 1.99,
+      "vol": 4775,
+      "ma5": 34.95,
+      "ma10": 34.88,
+      "dist_ma5": 2.72,
+      "range_pct": 2.9,
+      "up_days": 2,
+      "vol_ratio": 2.07,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -248.0,
+        "自營": 60.0,
+        "外商": 0.0,
+        "合計": -188.0
+      },
+      "grade": "B"
+    },
+    {
+      "code": "2014",
+      "name": "中鴻",
+      "close": 18.8,
+      "pct": 3.3,
+      "vol": 18215,
+      "ma5": 18.18,
+      "ma10": 17.74,
+      "dist_ma5": 3.41,
+      "range_pct": 8.82,
+      "up_days": 2,
+      "vol_ratio": 2.01,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 225.0,
+        "外商": 0.0,
+        "合計": 225.0
+      },
+      "grade": "B"
+    },
+    {
+      "code": "4532",
+      "name": "瑞智",
+      "close": 24.85,
+      "pct": 3.11,
+      "vol": 2039,
+      "ma5": 23.79,
+      "ma10": 23.59,
+      "dist_ma5": 4.46,
+      "range_pct": 4.74,
+      "up_days": 2,
+      "vol_ratio": 1.82,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -25.5,
+        "自營": 47.7,
+        "外商": 0.0,
+        "合計": 22.3
+      },
+      "grade": "B"
+    },
+    {
+      "code": "2023",
+      "name": "燁輝",
+      "close": 14.1,
+      "pct": 2.92,
+      "vol": 3605,
+      "ma5": 13.72,
+      "ma10": 13.68,
+      "dist_ma5": 2.77,
+      "range_pct": 2.95,
+      "up_days": 3,
+      "vol_ratio": 1.39,
+      "market": "TWSE",
+      "institutional": {
+        "投信": 0.0,
+        "自營": 47.0,
+        "外商": 0.0,
+        "合計": 47.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "1810",
+      "name": "和成",
+      "close": 20.1,
+      "pct": 2.55,
+      "vol": 3591,
+      "ma5": 19.81,
+      "ma10": 19.3,
+      "dist_ma5": 1.46,
+      "range_pct": 8.97,
+      "up_days": 3,
+      "vol_ratio": 0.82,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -31.2,
+        "自營": -1.0,
+        "外商": 0.0,
+        "合計": -32.2
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3406",
+      "name": "玉晶光",
+      "close": 606.0,
+      "pct": 1.85,
+      "vol": 2371,
+      "ma5": 591.6,
+      "ma10": 580.6,
+      "dist_ma5": 2.43,
+      "range_pct": 9.64,
+      "up_days": 1,
+      "vol_ratio": 1.06,
+      "market": "TWSE",
+      "institutional": {
+        "投信": -32.0,
+        "自營": 31.0,
+        "外商": 0.0,
+        "合計": -1.0
+      },
+      "grade": "B"
+    }
+  ],
+  "total": 13,
+  "market_summary": {
+    "limit_up_count": 94,
+    "market_mood": "熱絡",
+    "tpex_pct_pass": true
+  }
+}

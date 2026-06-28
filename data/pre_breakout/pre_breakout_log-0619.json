@@ -1,0 +1,210 @@
+{
+  "date": "20260619",
+  "generated": "20260619",
+  "candidates": [
+    {
+      "code": "1313",
+      "name": "聯成",
+      "market": "TWSE",
+      "close": 11.6,
+      "pct": 3.57,
+      "vol": 5487,
+      "ma5": 11.16,
+      "ma10": 11.12,
+      "dist_ma5": 3.94,
+      "range_pct": 5.56,
+      "up_days": 3,
+      "vol_ratio": 1.22,
+      "avg_vol_10": 4509,
+      "institutional": {
+        "投信": 0.0,
+        "自營": 5.0,
+        "外商": 195.0,
+        "合計": 200.0
+      },
+      "grade": "A"
+    },
+    {
+      "code": "6550",
+      "name": "北極星藥業-KY",
+      "market": "TWSE",
+      "close": 13.65,
+      "pct": 3.41,
+      "vol": 1766,
+      "ma5": 13.25,
+      "ma10": 13.21,
+      "dist_ma5": 3.02,
+      "range_pct": 3.46,
+      "up_days": 1,
+      "vol_ratio": 1.31,
+      "avg_vol_10": 1350,
+      "institutional": {
+        "投信": 0.0,
+        "自營": -2.0,
+        "外商": 140.6,
+        "合計": 138.6
+      },
+      "grade": "A"
+    },
+    {
+      "code": "9933",
+      "name": "中鼎",
+      "market": "TWSE",
+      "close": 42.65,
+      "pct": -0.93,
+      "vol": 4220,
+      "ma5": 42.08,
+      "ma10": 41.92,
+      "dist_ma5": 1.35,
+      "range_pct": 7.28,
+      "up_days": 3,
+      "vol_ratio": 0.58,
+      "avg_vol_10": 7278,
+      "institutional": {
+        "投信": 0.0,
+        "自營": -1.5,
+        "外商": -528.0,
+        "合計": -529.5
+      },
+      "grade": "B"
+    },
+    {
+      "code": "2439",
+      "name": "美律",
+      "market": "TWSE",
+      "close": 92.4,
+      "pct": -0.43,
+      "vol": 2513,
+      "ma5": 90.96,
+      "ma10": 90.95,
+      "dist_ma5": 1.58,
+      "range_pct": 3.8,
+      "up_days": 3,
+      "vol_ratio": 0.9,
+      "avg_vol_10": 2792,
+      "institutional": {
+        "投信": -53.0,
+        "自營": 21.0,
+        "外商": 117.0,
+        "合計": 85.0
+      },
+      "grade": "B"
+    },
+    {
+      "code": "1773",
+      "name": "勝一",
+      "market": "TWSE",
+      "close": 180.0,
+      "pct": 3.15,
+      "vol": 1205,
+      "ma5": 175.9,
+      "ma10": 174.65,
+      "dist_ma5": 2.33,
+      "range_pct": 6.82,
+      "up_days": 3,
+      "vol_ratio": 1.72,
+      "avg_vol_10": 702,
+      "institutional": {
+        "投信": 3.0,
+        "自營": 4.0,
+        "外商": -6.0,
+        "合計": 1.0
+      },
+      "grade": "B"
+    },
+    {
+      "code": "1432",
+      "name": "大魯閣",
+      "market": "TWSE",
+      "close": 17.6,
+      "pct": 1.15,
+      "vol": 1058,
+      "ma5": 17.29,
+      "ma10": 17.26,
+      "dist_ma5": 1.79,
+      "range_pct": 1.75,
+      "up_days": 3,
+      "vol_ratio": 2.27,
+      "avg_vol_10": 466,
+      "institutional": {
+        "投信": 0.0,
+        "自營": 0.0,
+        "外商": 8.0,
+        "合計": 8.0
+      },
+      "grade": "B"
+    },
+    {
+      "code": "2836",
+      "name": "高雄銀",
+      "market": "TWSE",
+      "close": 12.35,
+      "pct": 0.41,
+      "vol": 3004,
+      "ma5": 12.25,
+      "ma10": 12.2,
+      "dist_ma5": 0.82,
+      "range_pct": 3.78,
+      "up_days": 3,
+      "vol_ratio": 0.77,
+      "avg_vol_10": 3898,
+      "institutional": {
+        "投信": 0.0,
+        "自營": 0.0,
+        "外商": 7.0,
+        "合計": 7.0
+      },
+      "grade": "C"
+    },
+    {
+      "code": "1227",
+      "name": "佳格",
+      "market": "TWSE",
+      "close": 29.1,
+      "pct": 0.87,
+      "vol": 2304,
+      "ma5": 28.92,
+      "ma10": 28.71,
+      "dist_ma5": 0.62,
+      "range_pct": 2.83,
+      "up_days": 3,
+      "vol_ratio": 0.84,
+      "avg_vol_10": 2740,
+      "institutional": {
+        "投信": 0.0,
+        "自營": -1.0,
+        "外商": 26.2,
+        "合計": 25.2
+      },
+      "grade": "C"
+    },
+    {
+      "code": "9940",
+      "name": "信義",
+      "market": "TWSE",
+      "close": 19.85,
+      "pct": -0.75,
+      "vol": 1517,
+      "ma5": 19.79,
+      "ma10": 19.57,
+      "dist_ma5": 0.3,
+      "range_pct": 7.43,
+      "up_days": 3,
+      "vol_ratio": 1.59,
+      "avg_vol_10": 951,
+      "institutional": {
+        "投信": 0.0,
+        "自營": 97.0,
+        "外商": -31.0,
+        "合計": 66.0
+      },
+      "grade": "C"
+    }
+  ],
+  "total": 9,
+  "market_summary": {
+    "limit_up_count": 105,
+    "market_mood": " 熱絡",
+    "tpex_pct_pass": true
+  }
+}

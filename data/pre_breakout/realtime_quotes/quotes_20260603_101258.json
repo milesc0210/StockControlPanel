@@ -1,0 +1,102 @@
+{
+  "fetched_at": "2026-06-03T10:12:58",
+  "count": 8,
+  "quotes": [
+    {
+      "code": "2504",
+      "market": "TPE",
+      "price": 35.65,
+      "change": 0.45,
+      "change_pct": 1.28,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:51",
+      "name": "國產",
+      "ma5": 34.95,
+      "ma10": 34.88
+    },
+    {
+      "code": "2204",
+      "market": "TPE",
+      "price": 54.2,
+      "change": 0.2,
+      "change_pct": 0.37,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:52",
+      "name": "中華",
+      "ma5": 53.38,
+      "ma10": 53.02
+    },
+    {
+      "code": "2646",
+      "market": "TPE",
+      "price": 21.25,
+      "change": 0.35,
+      "change_pct": 1.67,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:53",
+      "name": "星宇航空",
+      "ma5": 20.43,
+      "ma10": 20.35
+    },
+    {
+      "code": "5608",
+      "market": "TPE",
+      "price": 14.85,
+      "change": 0.1,
+      "change_pct": 0.68,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:54",
+      "name": "四維航",
+      "ma5": 14.57,
+      "ma10": 14.45
+    },
+    {
+      "code": "2886",
+      "market": "TPE",
+      "price": 42.3,
+      "change": 0.6,
+      "change_pct": 1.44,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:55",
+      "name": "兆豐金",
+      "ma5": 40.48,
+      "ma10": 40.28
+    },
+    {
+      "code": "4306",
+      "market": "TPE",
+      "price": 14.85,
+      "change": 0.4,
+      "change_pct": 2.77,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:56",
+      "name": "炎洲",
+      "ma5": 14.08,
+      "ma10": 13.95
+    },
+    {
+      "code": "6443",
+      "market": "TPE",
+      "price": 43.25,
+      "change": 0.7,
+      "change_pct": 1.65,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:57",
+      "name": "元晶",
+      "ma5": 41.37,
+      "ma10": 41.12
+    },
+    {
+      "code": "2890",
+      "market": "TPE",
+      "price": 32.45,
+      "change": 1.45,
+      "change_pct": 4.68,
+      "open_high_low": [],
+      "fetched_at": "2026-06-03T10:12:57",
+      "name": "永豐金",
+      "ma5": 30.12,
+      "ma10": 29.89
+    }
+  ]
+}

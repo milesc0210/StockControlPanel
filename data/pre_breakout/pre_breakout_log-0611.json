@@ -1,0 +1,80 @@
+{
+  "date": "20260611",
+  "generated": "20260611",
+  "candidates": [
+    {
+      "code": "4721",
+      "name": "美琪瑪",
+      "market": "TPEX",
+      "close": 91.6,
+      "pct": -2.03,
+      "vol": 1986,
+      "ma5": 90.7,
+      "ma10": 90.17,
+      "dist_ma5": 0.99,
+      "range_pct": 8.62,
+      "up_days": 2,
+      "vol_ratio": 0.97,
+      "avg_vol_10": 2051,
+      "institutional": {},
+      "grade": "B"
+    },
+    {
+      "code": "4166",
+      "name": "友霖",
+      "market": "TPEX",
+      "close": 26.6,
+      "pct": 3.91,
+      "vol": 2729,
+      "ma5": 23.94,
+      "ma10": 23.78,
+      "dist_ma5": 11.11,
+      "range_pct": 9.87,
+      "up_days": 3,
+      "vol_ratio": 4.36,
+      "avg_vol_10": 626,
+      "institutional": {},
+      "grade": "C"
+    },
+    {
+      "code": "6186",
+      "name": "新潤",
+      "market": "TPEX",
+      "close": 41.0,
+      "pct": -2.38,
+      "vol": 1732,
+      "ma5": 40.75,
+      "ma10": 40.11,
+      "dist_ma5": 0.61,
+      "range_pct": 7.28,
+      "up_days": 4,
+      "vol_ratio": 1.41,
+      "avg_vol_10": 1224,
+      "institutional": {},
+      "grade": "C"
+    },
+    {
+      "code": "6220",
+      "name": "岳豐",
+      "market": "TPEX",
+      "close": 34.5,
+      "pct": 1.77,
+      "vol": 1072,
+      "ma5": 33.76,
+      "ma10": 33.53,
+      "dist_ma5": 2.19,
+      "range_pct": 7.69,
+      "up_days": 3,
+      "vol_ratio": 1.11,
+      "avg_vol_10": 969,
+      "institutional": {},
+      "grade": "C"
+    }
+  ],
+  "total": 4,
+  "market_summary": {
+    "limit_up_count": 28,
+    "market_mood": " 適中",
+    "tpex_pct_pass": true
+  }
+}

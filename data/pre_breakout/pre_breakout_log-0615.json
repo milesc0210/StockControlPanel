@@ -1,0 +1,188 @@
+{
+  "date": "20260615",
+  "generated": "20260615",
+  "candidates": [
+    {
+      "code": "3162",
+      "name": "精確",
+      "market": "TPEX",
+      "close": 84.5,
+      "pct": 1.2,
+      "vol": 1376,
+      "ma5": 84.32,
+      "ma10": 83.99,
+      "dist_ma5": 0.21,
+      "range_pct": 6.1,
+      "up_days": 2,
+      "vol_ratio": 0.54,
+      "avg_vol_10": 2556,
+      "institutional": {
+        "外商": 96.9,
+        "投信": 0.0,
+        "自營": -4.0,
+        "合計": 92.9
+      },
+      "grade": "B"
+    },
+    {
+      "code": "5498",
+      "name": "凱崴",
+      "market": "TPEX",
+      "close": 67.8,
+      "pct": -2.31,
+      "vol": 13543,
+      "ma5": 63.54,
+      "ma10": 63.24,
+      "dist_ma5": 6.7,
+      "range_pct": 20.49,
+      "up_days": 4,
+      "vol_ratio": 1.67,
+      "avg_vol_10": 8116,
+      "institutional": {
+        "外商": -1886.0,
+        "投信": 0.0,
+        "自營": -32.6,
+        "合計": -1918.6
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3152",
+      "name": "璟德",
+      "market": "TPEX",
+      "close": 222.5,
+      "pct": 0.68,
+      "vol": 3609,
+      "ma5": 198.9,
+      "ma10": 191.05,
+      "dist_ma5": 11.87,
+      "range_pct": 24.16,
+      "up_days": 3,
+      "vol_ratio": 1.89,
+      "avg_vol_10": 1905,
+      "institutional": {
+        "外商": -219.9,
+        "投信": 0.0,
+        "自營": 108.3,
+        "合計": -111.6
+      },
+      "grade": "C"
+    },
+    {
+      "code": "3322",
+      "name": "建舜電",
+      "market": "TPEX",
+      "close": 15.5,
+      "pct": 0.98,
+      "vol": 2104,
+      "ma5": 14.99,
+      "ma10": 14.59,
+      "dist_ma5": 3.4,
+      "range_pct": 15.93,
+      "up_days": 3,
+      "vol_ratio": 1.12,
+      "avg_vol_10": 1870,
+      "institutional": {
+        "外商": -196.9,
+        "投信": 0.0,
+        "自營": 0.0,
+        "合計": -196.9
+      },
+      "grade": "C"
+    },
+    {
+      "code": "4541",
+      "name": "晟田",
+      "market": "TPEX",
+      "close": 49.0,
+      "pct": 3.05,
+      "vol": 1738,
+      "ma5": 46.94,
+      "ma10": 46.91,
+      "dist_ma5": 4.39,
+      "range_pct": 3.71,
+      "up_days": 3,
+      "vol_ratio": 1.46,
+      "avg_vol_10": 1188,
+      "institutional": {
+        "外商": 376.0,
+        "投信": 0.0,
+        "自營": 9.5,
+        "合計": 385.5
+      },
+      "grade": "C"
+    },
+    {
+      "code": "5508",
+      "name": "永信建",
+      "market": "TPEX",
+      "close": 56.5,
+      "pct": -0.7,
+      "vol": 1505,
+      "ma5": 54.92,
+      "ma10": 53.45,
+      "dist_ma5": 2.88,
+      "range_pct": 22.73,
+      "up_days": 4,
+      "vol_ratio": 0.73,
+      "avg_vol_10": 2072,
+      "institutional": {
+        "外商": -342.9,
+        "投信": 0.0,
+        "自營": 2.5,
+        "合計": -340.3
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6223",
+      "name": "旺矽",
+      "market": "TPEX",
+      "close": 6435.0,
+      "pct": -0.77,
+      "vol": 1081,
+      "ma5": 5949.0,
+      "ma10": 5867.5,
+      "dist_ma5": 8.17,
+      "range_pct": 17.59,
+      "up_days": 4,
+      "vol_ratio": 0.87,
+      "avg_vol_10": 1239,
+      "institutional": {
+        "外商": -96.5,
+        "投信": -14.4,
+        "自營": 10.7,
+        "合計": -100.1
+      },
+      "grade": "C"
+    },
+    {
+      "code": "6186",
+      "name": "新潤",
+      "market": "TPEX",
+      "close": 41.15,
+      "pct": 0.24,
+      "vol": 1056,
+      "ma5": 40.86,
+      "ma10": 40.44,
+      "dist_ma5": 0.71,
+      "range_pct": 7.14,
+      "up_days": 4,
+      "vol_ratio": 0.76,
+      "avg_vol_10": 1391,
+      "institutional": {
+        "外商": 134.0,
+        "投信": 0.0,
+        "自營": -1.6,
+        "合計": 132.4
+      },
+      "grade": "C"
+    }
+  ],
+  "total": 8,
+  "market_summary": {
+    "limit_up_count": 52,
+    "market_mood": " 熱絡",
+    "tpex_pct_pass": true
+  }
+}

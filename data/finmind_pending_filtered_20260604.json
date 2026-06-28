@@ -1,0 +1,32 @@
+{
+  "date": "20260604",
+  "filter_rule": "price >= 200 AND volume < 1000張",
+  "pass1_count": 198,
+  "after_filter_count": 4,
+  "candidates": [
+    {
+      "code": "4766",
+      "name": "南寶",
+      "close": 374.0,
+      "volume_lots": 764
+    },
+    {
+      "code": "6491",
+      "name": "晶碩",
+      "close": 328.0,
+      "volume_lots": 591
+    },
+    {
+      "code": "6944",
+      "name": "兆聯實業",
+      "close": 934.0,
+      "volume_lots": 959
+    },
+    {
+      "code": "7749",
+      "name": "意騰-KY",
+      "close": 484.0,
+      "volume_lots": 561
+    }
+  ]
+}
