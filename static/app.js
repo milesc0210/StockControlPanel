@@ -183,18 +183,35 @@ function renderActionButtons() {
   elements.intradayButton.title = isIntradayAvailable() ? '' : '僅盤中時段可用';
 }
 
-async function loadSettingsIntoForm() {
+async function fetchSettingsPayload() {
   const response = await fetch('/api/settings');
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error || '讀取設定失敗');
   }
+  return payload;
+}
 
+async function loadSettingsIntoForm() {
+  const payload = await fetchSettingsPayload();
   elements.finmindTokenInput.value = payload.finmind_token || '';
   elements.fugleTokenInput.value = payload.fugle_intraday_api_key || '';
   elements.finmindTokenHint.textContent = payload.has_finmind_token ? `已設定：${payload.masked_finmind_token}` : '未設定';
   elements.fugleTokenHint.textContent = payload.has_fugle_intraday_api_key ? `已設定：${payload.masked_fugle_intraday_api_key}` : '未設定';
   elements.settingsMeta.textContent = '設定會寫入 \\StockControlPanel\\.env';
+}
+
+async function ensureTokenConfigured(kind) {
+  const settings = await fetchSettingsPayload();
+  if (kind === 'fugle' && settings.has_fugle_intraday_api_key) return true;
+  if (kind === 'finmind' && settings.has_finmind_token) return true;
+
+  const missingLabel = kind === 'fugle' ? 'FUGLE_INTRADAY_API_KEY' : 'FINMIND_TOKEN';
+  const actionLabel = kind === 'fugle' ? '即時行情' : '法人查詢';
+  setStatus(`${actionLabel}缺少 Token`, 'failed');
+  renderPlainOutput(`主人，${actionLabel}前要先到設定頁填入 ${missingLabel}。`, 'error-output');
+  openSettingsModal();
+  return false;
 }
 
 function openSettingsModal() {
@@ -1468,6 +1485,7 @@ async function refreshFuture() {
 
 async function runInstitutional() {
   if (!isPreBreakoutFunction() || !state.selectedDate) return;
+  if (!(await ensureTokenConfigured('finmind'))) return;
 
   elements.institutionalButton.disabled = true;
   setStatus('法人查詢中...', 'running');
@@ -1508,6 +1526,7 @@ async function runInstitutional() {
 
 async function runIntraday() {
   if (!isPreBreakoutIntraday() || !state.selectedDate) return;
+  if (!(await ensureTokenConfigured('fugle'))) return;
 
   await refreshMarketState();
   renderActionButtons();

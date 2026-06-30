@@ -1008,6 +1008,8 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
         raise RuntimeError("只有保守選股及標準選股支援即時行情。")
     if not is_intraday_market_open():
         raise RuntimeError("目前非盤中時段，即時行情功能暫不啟用。")
+    if not get_secret_value("FUGLE_INTRADAY_API_KEY"):
+        raise RuntimeError("缺少 FUGLE_INTRADAY_API_KEY，請先到設定頁輸入富果 API Key。")
 
     started_at = taipei_now()
     started_perf = time.perf_counter()
