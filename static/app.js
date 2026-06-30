@@ -154,12 +154,17 @@ function isFearGreedFunction(functionKey = state.selectedKey) {
   return functionKey === 'cnn_fear_greed_index';
 }
 
-function isPreBreakoutIntraday(functionKey = state.selectedKey) {
-  return functionKey === 'pre_breakout_conservative' || functionKey === 'pre_breakout_standard';
+function isIntradayFunction(functionKey = state.selectedKey) {
+  return [
+    'pre_breakout_conservative',
+    'pre_breakout_standard',
+    'ma_bullish_turning_point',
+    'limit_up_red_arrow',
+  ].includes(functionKey);
 }
 
 function isIntradayAvailable() {
-  return isPreBreakoutIntraday() && Boolean(state.selectedDate) && Boolean(state.marketState?.market_open);
+  return isIntradayFunction() && Boolean(state.selectedDate) && Boolean(state.marketState?.market_open);
 }
 
 function getInstitutionalMap() {
@@ -173,7 +178,7 @@ function getIntradayMap() {
 function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
   const showInstitutional = !isFearGreed && isPreBreakoutFunction() && Boolean(state.selectedDate);
-  const showIntraday = !isFearGreed && isPreBreakoutIntraday() && Boolean(state.selectedDate);
+  const showIntraday = !isFearGreed && isIntradayFunction() && Boolean(state.selectedDate);
   elements.dateControlWrap.hidden = isFearGreed;
   elements.runButton.hidden = !state.selectedFunction?.executable;
   elements.refreshFutureButton.hidden = isFearGreed || !state.selectedFunction?.executable;
@@ -1039,20 +1044,39 @@ function buildSummaryChips(summary) {
 
 function renderLimitUp(parsed) {
   const stocks = parsed.stocks;
+  const intradayMap = getIntradayMap();
+  const intradaySummary = state.currentRun?.intraday?.payload;
+  const showIntradayColumns = isIntradayFunction();
+
   if (!stocks.length) {
     elements.latestOutput.className = 'output-box rich-output';
     elements.latestOutput.innerHTML = `
-      <div class="summary-grid">${buildSummaryChips({ '比較區間': parsed.summary.range, '入選數量': parsed.summary.count })}</div>
+      <div class="summary-grid">${buildSummaryChips({
+        '比較區間': parsed.summary.range,
+        '入選數量': parsed.summary.count,
+        '即時行情': showIntradayColumns ? (state.marketState?.market_open ? '尚未查詢' : '盤後停用') : '',
+      })}</div>
       <div class="empty-block">沒有可顯示的股票。</div>`;
     return;
   }
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
+  const intradayStatus = showIntradayColumns
+    ? (intradaySummary
+        ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
+        : (state.marketState?.market_open ? '尚未查詢' : '盤後停用'))
+    : '';
 
-  // ——— header ———
-  let html = `<div class="summary-grid">${buildSummaryChips({ '比較區間': parsed.summary.range, '入選數量': parsed.summary.count })}</div>`;
+  let html = `<div class="summary-grid">${buildSummaryChips({
+    '比較區間': parsed.summary.range,
+    '入選數量': parsed.summary.count,
+    '即時行情': intradayStatus,
+  })}</div>`;
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
   html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
+  if (showIntradayColumns) {
+    html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
+  }
 
   if (maxFutureDays > 0 && stocks[0].futureDays.length > 0) {
     for (const day of stocks[0].futureDays) {
@@ -1062,14 +1086,22 @@ function renderLimitUp(parsed) {
   }
   html += '</tr></thead><tbody>';
 
-  // ——— rows ———
   for (const stock of stocks) {
+    const intraday = intradayMap[stock.code] || {};
     html += '<tr>';
     html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
     html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
     html += buildInlineKlineSlot(stock);
     html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
     html += `<td class="td-number">${escapeHtml(stock.volume)}</td>`;
+    if (showIntradayColumns) {
+      const intradayTone = toneClassFromNumber(intraday.change_percent);
+      const intradayCellClass = intraday.error ? 'td-future td-empty' : `td-future td-intraday ${intradayTone}`;
+      const intradayPrice = intraday.error ? '—' : formatPrice(intraday.last_price);
+      const intradayChange = intraday.error ? '' : formatChangePercent(intraday.change_percent);
+      html += `<td class="${intradayCellClass}"><strong>${intradayPrice}</strong>${intraday.error ? '' : `<span class="${intradayTone}">${escapeHtml(intradayChange)}</span>`}</td>`;
+      html += `<td class="td-number">${intraday.error ? '—' : formatVolume(intraday.trade_volume)}</td>`;
+    }
 
     if (maxFutureDays > 0) {
       for (const day of stock.futureDays) {
@@ -1077,7 +1109,6 @@ function renderLimitUp(parsed) {
         html += `<td class="td-future"><strong>${escapeHtml(day.close)}</strong>`;
         html += `<span class="${prevCls}">${escapeHtml(day.pctFromPrev)}</span></td>`;
       }
-      // 合計漲跌幅 = 最後一日 vs 起始日
       const lastDay = stock.futureDays[stock.futureDays.length - 1];
       if (lastDay) {
         const signalCls = lastDay.pctFromSignal.startsWith('+') ? 'up-text' : lastDay.pctFromSignal.startsWith('-') ? 'down-text' : '';
@@ -1085,7 +1116,6 @@ function renderLimitUp(parsed) {
       } else {
         html += '<td class="td-future td-empty">—</td>';
       }
-      // 補齊空欄位
       for (let i = stock.futureDays.length; i < maxFutureDays; i++) {
         html += '<td class="td-future td-empty">—</td>';
       }
@@ -1107,7 +1137,7 @@ function renderPreBreakout(parsed) {
   const institutionalSummary = state.currentRun?.institutional?.payload;
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
-  const showIntradayColumns = isPreBreakoutIntraday();
+  const showIntradayColumns = isIntradayFunction();
 
   if (!stocks.length) {
     elements.latestOutput.className = 'output-box rich-output';
@@ -1198,20 +1228,42 @@ function renderPreBreakout(parsed) {
 
 function renderMaBullish(parsed) {
   const stocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
+  const intradayMap = getIntradayMap();
+  const intradaySummary = state.currentRun?.intraday?.payload;
+  const showIntradayColumns = isIntradayFunction();
   if (!stocks.length) {
     elements.latestOutput.className = 'output-box rich-output';
     elements.latestOutput.innerHTML = `
-      <div class="summary-grid">${buildSummaryChips({ '比較區間': parsed.summary.range, '入選數量': parsed.summary.count, '型態': 'MA5 > MA10 > MA20 新成形' })}</div>
+      <div class="summary-grid">${buildSummaryChips({
+        '比較區間': parsed.summary.range,
+        '入選數量': parsed.summary.count,
+        '型態': 'MA5 > MA10 > MA20 新成形',
+        '即時行情': showIntradayColumns ? (state.marketState?.market_open ? '尚未查詢' : '盤後停用') : '',
+      })}</div>
       <div class="empty-block">沒有可顯示的股票。</div>`;
     return;
   }
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
-  const totalColumns = 7 + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
+  const extraIntradayColumns = showIntradayColumns ? 2 : 0;
+  const totalColumns = 7 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
+  const intradayStatus = showIntradayColumns
+    ? (intradaySummary
+        ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
+        : (state.marketState?.market_open ? '尚未查詢' : '盤後停用'))
+    : '';
 
-  let html = `<div class="summary-grid">${buildSummaryChips({ '比較區間': parsed.summary.range, '入選數量': parsed.summary.count, '型態': 'MA5 > MA10 > MA20 新成形' })}</div>`;
+  let html = `<div class="summary-grid">${buildSummaryChips({
+    '比較區間': parsed.summary.range,
+    '入選數量': parsed.summary.count,
+    '型態': 'MA5 > MA10 > MA20 新成形',
+    '即時行情': intradayStatus,
+  })}</div>`;
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
   html += '<th>族群</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">量能倍數</th>';
+  if (showIntradayColumns) {
+    html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
+  }
 
   if (maxFutureDays > 0 && stocks[0].futureDays.length > 0) {
     for (const day of stocks[0].futureDays) {
@@ -1223,6 +1275,7 @@ function renderMaBullish(parsed) {
 
   let currentTheme = null;
   for (const stock of stocks) {
+    const intraday = intradayMap[stock.code] || {};
     if (stock.themeName && stock.themeName !== currentTheme) {
       currentTheme = stock.themeName;
       const themeMeta = parsed.sector?.themeRows?.find((row) => row.themeName === stock.themeName);
@@ -1238,6 +1291,14 @@ function renderMaBullish(parsed) {
     html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
     html += `<td class="td-number">${escapeHtml(stock.volume)}</td>`;
     html += `<td class="td-number up-text">${escapeHtml(stock.multiple)}倍</td>`;
+    if (showIntradayColumns) {
+      const intradayTone = toneClassFromNumber(intraday.change_percent);
+      const intradayCellClass = intraday.error ? 'td-future td-empty' : `td-future td-intraday ${intradayTone}`;
+      const intradayPrice = intraday.error ? '—' : formatPrice(intraday.last_price);
+      const intradayChange = intraday.error ? '' : formatChangePercent(intraday.change_percent);
+      html += `<td class="${intradayCellClass}"><strong>${intradayPrice}</strong>${intraday.error ? '' : `<span class="${intradayTone}">${escapeHtml(intradayChange)}</span>`}</td>`;
+      html += `<td class="td-number">${intraday.error ? '—' : formatVolume(intraday.trade_volume)}</td>`;
+    }
 
     if (maxFutureDays > 0) {
       for (const day of stock.futureDays) {
@@ -1525,7 +1586,7 @@ async function runInstitutional() {
 }
 
 async function runIntraday() {
-  if (!isPreBreakoutIntraday() || !state.selectedDate) return;
+  if (!isIntradayFunction() || !state.selectedDate) return;
   if (!(await ensureTokenConfigured('fugle'))) return;
 
   await refreshMarketState();

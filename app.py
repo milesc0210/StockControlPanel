@@ -82,6 +82,12 @@ OUTPUT_WATCH_DIRS = [
     DATA_ROOT / "pre_breakout",
 ]
 PRE_BREAKOUT_FUNCTION_KEYS = {"pre_breakout_standard", "pre_breakout_conservative"}
+INTRADAY_FUNCTION_KEYS = {
+    "pre_breakout_standard",
+    "pre_breakout_conservative",
+    "ma_bullish_turning_point",
+    "limit_up_red_arrow",
+}
 FEAR_GREED_FUNCTION_KEY = "cnn_fear_greed_index"
 FINMIND_API_URL = "https://api.finmindtrade.com/api/v4/data"
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
@@ -977,6 +983,58 @@ def parse_pre_breakout_candidates(output_text: str) -> list[dict[str, str]]:
     return stocks
 
 
+def parse_limit_up_candidates(output_text: str) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+)張(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+\|\s+後5日=(.+))?$"
+    )
+    stocks: list[dict[str, str]] = []
+    for raw_line in output_text.splitlines():
+        line = raw_line.strip()
+        match = pattern.match(line)
+        if not match:
+            continue
+        stocks.append(
+            {
+                "code": match.group(2),
+                "name": match.group(3),
+                "close": match.group(4),
+                "volume": match.group(5),
+            }
+        )
+    return stocks
+
+
+def parse_ma_bullish_candidates(output_text: str) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+C=([\d.]+)\s+V=([\d.]+)張\s+倍數=([\d.]+)\s+\|\s+後5日=(.+)$"
+    )
+    stocks: list[dict[str, str]] = []
+    for raw_line in output_text.splitlines():
+        line = raw_line.strip()
+        match = pattern.match(line)
+        if not match:
+            continue
+        stocks.append(
+            {
+                "code": match.group(2),
+                "name": match.group(3),
+                "close": match.group(4),
+                "volume": match.group(5),
+            }
+        )
+    return stocks
+
+
+def parse_intraday_candidates(function_key: str, output_text: str) -> list[dict[str, str]]:
+    if function_key in PRE_BREAKOUT_FUNCTION_KEYS:
+        return parse_pre_breakout_candidates(output_text)
+    if function_key == "limit_up_red_arrow":
+        return parse_limit_up_candidates(output_text)
+    if function_key == "ma_bullish_turning_point":
+        return parse_ma_bullish_candidates(output_text)
+    return []
+
+
 def fetch_fugle_intraday_quote(symbol: str) -> dict[str, Any]:
     cache_key = str(symbol).strip()
     cached = intraday_quote_cache.get(cache_key)
@@ -1004,8 +1062,8 @@ def fetch_fugle_intraday_quote(symbol: str) -> dict[str, Any]:
 
 
 def build_intraday_payload(function_key: str, result_date: str, output_text: str) -> tuple[str, dict[str, Any], float]:
-    if function_key not in {"pre_breakout_conservative", "pre_breakout_standard"}:
-        raise RuntimeError("只有保守選股及標準選股支援即時行情。")
+    if function_key not in INTRADAY_FUNCTION_KEYS:
+        raise RuntimeError("只有標準選股、保守選股、均線多頭新成形、漲停紅箭支援即時行情。")
     if not is_intraday_market_open():
         raise RuntimeError("目前非盤中時段，即時行情功能暫不啟用。")
     if not get_secret_value("FUGLE_INTRADAY_API_KEY"):
@@ -1013,7 +1071,7 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
 
     started_at = taipei_now()
     started_perf = time.perf_counter()
-    candidates = parse_pre_breakout_candidates(output_text)
+    candidates = parse_intraday_candidates(function_key, output_text)
     if not candidates:
         raise RuntimeError("目前結果沒有可查詢的股票清單。")
 
@@ -2042,8 +2100,8 @@ def api_institutional(function_key: str) -> Any:
 
 @app.route("/api/intraday/<function_key>", methods=["POST"])
 def api_intraday(function_key: str) -> Any:
-    if function_key not in {"pre_breakout_conservative", "pre_breakout_standard"}:
-        return jsonify({"error": "只有保守選股及標準選股支援即時行情。"}), 400
+    if function_key not in INTRADAY_FUNCTION_KEYS:
+        return jsonify({"error": "只有標準選股、保守選股、均線多頭新成形、漲停紅箭支援即時行情。"}), 400
 
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
