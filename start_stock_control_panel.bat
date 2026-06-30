@@ -18,5 +18,11 @@ if errorlevel 1 (
     python -m pip install -r requirements.txt
 )
 
-start "" http://127.0.0.1:8765
-python app.py
+python launch_stock_control_panel.py
+if errorlevel 1 (
+    echo [StockControlPanel] 啟動失敗，請查看 logs\stock_control_panel.log
+    pause
+    exit /b 1
+)
+
+exit /b 0

@@ -42,6 +42,7 @@ UPDATE_TRACKED_PATHS = [
     "app.py",
     "requirements.txt",
     "start_stock_control_panel.bat",
+    "launch_stock_control_panel.py",
     "templates/index.html",
     "static/app.js",
     "static/style.css",
