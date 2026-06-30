@@ -957,7 +957,7 @@ def is_intraday_market_open(now: datetime | None = None) -> bool:
 
 
 def parse_pre_breakout_candidates(output_text: str) -> list[dict[str, str]]:
-    pattern = re.compile(r"^([ABC])\s+(\d+)\s+(\S+)\s+\|\s+C=([\d.]+)\s+V=(\d+)張\s+\|\s+後5日=(.+)$")
+    pattern = re.compile(r"^([ABC])\s+(\d+)\s+(\S+)\s+\|\s+C=([\d.]+)\s+V=(\d+)張(?:\s+分數=([\d.]+))?\s+\|\s+後5日=(.+)$")
     stocks: list[dict[str, str]] = []
     for raw_line in output_text.splitlines():
         line = raw_line.strip()
