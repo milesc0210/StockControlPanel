@@ -265,7 +265,7 @@ async function runSelfUpdate() {
       button_enabled: false,
     }, payload.updated ? '請重新啟動' : '已是最新版');
     if (payload.updated) {
-      window.alert('更新完成，請先關閉程式，再重新啟動。');
+      window.alert('更新完成，請直接重新啟動程式即可；啟動器會自動關閉舊的 8765 服務，不需要再手動執行 stop_8765_port.bat。');
     } else {
       window.alert('目前已是最新版本。');
     }

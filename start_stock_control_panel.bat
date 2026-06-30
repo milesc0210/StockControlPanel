@@ -2,6 +2,11 @@
 setlocal
 cd /d "%~dp0"
 
+if exist "stop_8765_port.bat" (
+    call "stop_8765_port.bat" >nul 2>&1
+    timeout /t 1 /nobreak >nul
+)
+
 if not exist ".venv\Scripts\python.exe" (
     py -3 -m venv .venv
 )
