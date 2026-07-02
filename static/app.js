@@ -727,7 +727,7 @@ function parseLimitUpOutput(text) {
       });
     }
   }
-  return { type: 'limit_up', summary, stocks };
+  return { type: 'limit_up', summary, stocks, sector: parseSectorQuickOutput(text) };
 }
 
 function parsePreBreakoutOutput(text) {
@@ -816,7 +816,7 @@ function parseMaBullishOutput(text) {
 
 function parseSectorQuickOutput(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (!lines.some((line) => line.includes('策略：0121 快速族群分析'))) return null;
+  if (!lines.some((line) => line.includes('策略：0121 快速族群分析') || line.includes('策略：今日漲停 快速族群分析'))) return null;
 
   const result = {
     firstTierText: '',
@@ -847,13 +847,13 @@ function parseSectorQuickOutput(text) {
       section = 'singleton';
       continue;
     }
-    if (line === '量比前段班：') {
+    if (line === '量比前段班：' || line === '成交量前段班：') {
       section = '';
       continue;
     }
 
     if (section === 'distribution' && line.startsWith('- ')) {
-      const match = line.match(/^-\s+(.+?):\s+(\d+)\s+檔\s+\|\s+均量比=([\d.]+)\s+\|\s+成員=(.+)$/);
+      const match = line.match(/^-\s+(.+?):\s+(\d+)\s+檔\s+\|\s+(?:均量比|均成交量)=([\d.]+)(?:張)?\s+\|\s+成員=(.+)$/);
       if (!match) continue;
       const themeName = match[1].trim();
       const count = Number(match[2]);
@@ -1044,7 +1044,7 @@ function buildSummaryChips(summary) {
 }
 
 function renderLimitUp(parsed) {
-  const stocks = parsed.stocks;
+  const stocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
   const showIntradayColumns = isIntradayFunction();
@@ -1062,6 +1062,8 @@ function renderLimitUp(parsed) {
   }
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
+  const extraIntradayColumns = showIntradayColumns ? 2 : 0;
+  const totalColumns = (parsed.sector ? 1 : 0) + 5 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
   const intradayStatus = showIntradayColumns
     ? (intradaySummary
         ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
@@ -1075,6 +1077,9 @@ function renderLimitUp(parsed) {
     '即時行情': intradayStatus,
   })}</div>`;
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  if (parsed.sector) {
+    html += '<th>族群</th>';
+  }
   html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
   if (showIntradayColumns) {
     html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
@@ -1088,9 +1093,19 @@ function renderLimitUp(parsed) {
   }
   html += '</tr></thead><tbody>';
 
+  let currentTheme = null;
   for (const stock of stocks) {
     const intraday = intradayMap[stock.code] || {};
+    if (parsed.sector && stock.themeName && stock.themeName !== currentTheme) {
+      currentTheme = stock.themeName;
+      const themeMeta = parsed.sector?.themeRows?.find((row) => row.themeName === stock.themeName);
+      const themeLabel = themeMeta ? `${themeMeta.themeName}｜${themeMeta.count} 檔` : stock.themeName;
+      html += `<tr class="group-divider-row"><td colspan="${totalColumns}"><div class="group-divider-label">${escapeHtml(themeLabel)}</div></td></tr>`;
+    }
     html += '<tr>';
+    if (parsed.sector) {
+      html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
+    }
     html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
     html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
     html += buildInlineKlineSlot(stock);
