@@ -47,6 +47,7 @@ UPDATE_TRACKED_PATHS = [
     "static/app.js",
     "static/style.css",
     "scripts/fetch_klines.py",
+    "scripts/screen_today_limitup.py",
     "scripts/pre_breakout_screen.py",
     "scripts/twse_tpex_fetch.py",
 ]
@@ -135,6 +136,13 @@ FUNCTIONS: list[FunctionSpec] = [
         name="漲停紅箭",
         category="訊號型功能",
         description="前一日漲停，最近一日上引紅。",
+        executable=True,
+    ),
+    FunctionSpec(
+        key="today_limit_up",
+        name="今日漲停",
+        category="訊號型功能",
+        description="指定日期收盤漲停，且成交量大於 2000 張。",
         executable=True,
     ),
     FunctionSpec(
@@ -662,6 +670,8 @@ def build_commands(spec: FunctionSpec, target_date: str | None = None) -> list[l
 
     if spec.key == "limit_up_red_arrow":
         return [[PYTHON_BIN, str(scripts_dir / "screen_limitup_upperwick.py"), "--latest-date", latest_date, "--no-save"]]
+    if spec.key == "today_limit_up":
+        return [[PYTHON_BIN, str(scripts_dir / "screen_today_limitup.py"), "--date", latest_date, "--no-save"]]
     if spec.key == "ma_bullish_turning_point":
         return [
             [PYTHON_BIN, str(scripts_dir / "screen_ma_alignment_turning_point.py"), "--latest-date", latest_date, "--no-save"],
@@ -805,7 +815,7 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
         return None
 
     output_text = row["output_text"] or ""
-    if function_key in {"limit_up_red_arrow", "ma_bullish_turning_point"} and "後5日=" not in output_text:
+    if function_key in {"limit_up_red_arrow", "today_limit_up", "ma_bullish_turning_point"} and "後5日=" not in output_text:
         return None
     if (
         function_key == "ma_bullish_turning_point"

@@ -681,12 +681,13 @@ function renderDateOptions() {
 
 function parseLimitUpOutput(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (!lines.some((line) => line.includes('策略：前一交易日漲停'))) return null;
+  if (!lines.some((line) => line.includes('策略：前一交易日漲停') || line.includes('策略：指定日期漲停'))) return null;
 
   const summary = {};
   const stocks = [];
   for (const line of lines) {
     if (line.startsWith('比較區間：')) summary.range = line.replace('比較區間：', '').trim();
+    if (line.startsWith('參考前日：')) summary.referenceDate = line.replace('參考前日：', '').trim();
     if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
     const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+張)(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+\|\s+後5日=(.+))?$/);
     if (match) {
@@ -1069,6 +1070,7 @@ function renderLimitUp(parsed) {
 
   let html = `<div class="summary-grid">${buildSummaryChips({
     '比較區間': parsed.summary.range,
+    '參考前日': parsed.summary.referenceDate,
     '入選數量': parsed.summary.count,
     '即時行情': intradayStatus,
   })}</div>`;
