@@ -20,7 +20,7 @@ import argparse
 import json
 import re
 from dataclasses import asdict, dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_DOWN
 from pathlib import Path
 from typing import Iterable
 
@@ -129,7 +129,7 @@ def tick_size(price: float) -> Decimal:
 def round_to_tick(price: float) -> float:
     raw = Decimal(str(price))
     tick = tick_size(price)
-    units = (raw / tick).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    units = (raw / tick).quantize(Decimal("1"), rounding=ROUND_DOWN)
     return float(units * tick)
 
 
