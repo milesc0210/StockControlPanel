@@ -85,6 +85,7 @@ OUTPUT_WATCH_DIRS = [
     DATA_ROOT / "pre_breakout",
 ]
 PRE_BREAKOUT_FUNCTION_KEYS = {"pre_breakout_standard", "pre_breakout_conservative"}
+BACKTESTABLE_FUNCTION_KEYS = PRE_BREAKOUT_FUNCTION_KEYS
 INTRADAY_FUNCTION_KEYS = {
     "pre_breakout_standard",
     "pre_breakout_conservative",
@@ -2058,6 +2059,58 @@ def api_refresh_future(function_key: str) -> Any:
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
     return jsonify(run_function(spec, requested_date=result_date, skip_cache=True))
+
+
+@app.route("/api/backtest/<function_key>", methods=["POST"])
+def api_backtest(function_key: str) -> Any:
+    if function_key not in BACKTESTABLE_FUNCTION_KEYS:
+        return jsonify({"error": "只有標準選股與保守選股支援回測。"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    start_date = str(payload.get("start_date") or "").strip()
+    end_date = str(payload.get("end_date") or latest_valid_shared_date()).strip()
+    take_profit_pct = str(payload.get("take_profit_pct") or "10").strip()
+    stop_loss_pct = str(payload.get("stop_loss_pct") or "5").strip()
+    entry_band_pct = str(payload.get("entry_band_pct") or "3").strip()
+    max_hold_days = str(payload.get("max_hold_days") or "5").strip()
+    shares = str(payload.get("shares") or "1000").strip()
+    if not start_date:
+        return jsonify({"error": "缺少開始日期。"}), 400
+
+    script_path = SCRIPTS_DIR / "pre_breakout_backtest.py"
+    if not script_path.exists():
+        return jsonify({"error": "找不到 pre_breakout_backtest.py。"}), 400
+
+    command = [
+        PYTHON_BIN,
+        str(script_path),
+        "--function-key",
+        function_key,
+        "--start-date",
+        start_date,
+        "--end-date",
+        end_date,
+        "--take-profit-pct",
+        take_profit_pct,
+        "--stop-loss-pct",
+        stop_loss_pct,
+        "--entry-band-pct",
+        entry_band_pct,
+        "--max-hold-days",
+        max_hold_days,
+        "--shares",
+        shares,
+    ]
+    try:
+        result = run_command(command, timeout=600)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    if result.returncode != 0:
+        return jsonify({"error": result.stderr.strip() or result.stdout.strip() or "回測失敗。"}), 400
+    try:
+        return jsonify(json.loads(result.stdout.strip()))
+    except Exception:
+        return jsonify({"error": "回測輸出不是有效 JSON。", "raw": result.stdout.strip()[:1000]}), 400
 
 
 @app.route("/api/institutional/<function_key>", methods=["POST"])

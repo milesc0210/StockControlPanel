@@ -7,6 +7,7 @@ const state = {
   currentRun: null,
   currentKlineCode: '',
   fearGreed: null,
+  backtestResult: null,
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
   selfUpdateProgressTimer: null,
   updateStatusChecked: false,
@@ -49,6 +50,15 @@ const elements = {
   klineModalTitle: document.getElementById('kline-modal-title'),
   klineModalMeta: document.getElementById('kline-modal-meta'),
   klineModalClose: document.getElementById('kline-modal-close'),
+  backtestPanel: document.getElementById('backtest-panel'),
+  backtestStartDate: document.getElementById('backtest-start-date'),
+  backtestEndDate: document.getElementById('backtest-end-date'),
+  backtestTp: document.getElementById('backtest-tp'),
+  backtestSl: document.getElementById('backtest-sl'),
+  backtestRunButton: document.getElementById('backtest-run-button'),
+  backtestStatusPill: document.getElementById('backtest-status-pill'),
+  backtestMeta: document.getElementById('backtest-meta'),
+  backtestOutput: document.getElementById('backtest-output'),
 };
 
 function setStatus(text, tone = 'neutral') {
@@ -150,6 +160,10 @@ function isPreBreakoutFunction(functionKey = state.selectedKey) {
   return functionKey === 'pre_breakout_standard' || functionKey === 'pre_breakout_conservative';
 }
 
+function isBacktestFunction(functionKey = state.selectedKey) {
+  return isPreBreakoutFunction(functionKey);
+}
+
 function isFearGreedFunction(functionKey = state.selectedKey) {
   return functionKey === 'cnn_fear_greed_index';
 }
@@ -179,6 +193,7 @@ function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
   const showInstitutional = !isFearGreed && isPreBreakoutFunction() && Boolean(state.selectedDate);
   const showIntraday = !isFearGreed && isIntradayFunction() && Boolean(state.selectedDate);
+  const showBacktest = !isFearGreed && isBacktestFunction();
   elements.dateControlWrap.hidden = isFearGreed;
   elements.runButton.hidden = !state.selectedFunction?.executable;
   elements.refreshFutureButton.hidden = isFearGreed || !state.selectedFunction?.executable;
@@ -186,6 +201,7 @@ function renderActionButtons() {
   elements.intradayButton.hidden = !showIntraday;
   elements.intradayButton.disabled = !isIntradayAvailable();
   elements.intradayButton.title = isIntradayAvailable() ? '' : '僅盤中時段可用';
+  elements.backtestPanel.hidden = !showBacktest;
 }
 
 async function fetchSettingsPayload() {
@@ -901,6 +917,113 @@ function renderPlainOutput(text, tone = 'normal') {
   elements.latestOutput.innerHTML = `<pre>${escapeHtml(text || '(無輸出)')}</pre>`;
 }
 
+function setBacktestStatus(text, tone = 'neutral') {
+  elements.backtestStatusPill.textContent = text;
+  elements.backtestStatusPill.className = `status-pill ${tone}`;
+}
+
+function formatSignedPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  const sign = number > 0 ? '+' : '';
+  return `${sign}${number.toFixed(3)}%`;
+}
+
+function formatMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return number.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+function renderBacktestEmpty(message = '標準選股 / 保守選股可在這裡直接回測。') {
+  elements.backtestMeta.innerHTML = '';
+  elements.backtestOutput.className = 'output-box empty';
+  elements.backtestOutput.innerHTML = escapeHtml(message);
+}
+
+function syncBacktestInputsFromDates() {
+  if (!state.dates.length) return;
+  const earliest = state.dates[state.dates.length - 1];
+  const latest = state.dates[0];
+  if (!elements.backtestStartDate.value) {
+    elements.backtestStartDate.value = toInputDate(earliest);
+  }
+  if (!elements.backtestEndDate.value) {
+    elements.backtestEndDate.value = toInputDate(latest);
+  }
+  elements.backtestStartDate.min = toInputDate(earliest);
+  elements.backtestStartDate.max = toInputDate(latest);
+  elements.backtestEndDate.min = toInputDate(earliest);
+  elements.backtestEndDate.max = toInputDate(latest);
+}
+
+function renderBacktest(payload) {
+  state.backtestResult = payload;
+  elements.backtestMeta.innerHTML = '';
+
+  const metaItems = [
+    ['策略', payload.function_name],
+    ['回測區間', `${formatYmd(payload.params.start_date)} ～ ${formatYmd(payload.params.end_date)}`],
+    ['停利 / 停損', `${payload.params.take_profit_pct}% / ${payload.params.stop_loss_pct}%`],
+    ['固定條件', `±${payload.params.entry_band_pct}%、${payload.params.position_size_label}、最多 ${payload.params.max_hold_days} 天`],
+  ];
+  for (const [label, value] of metaItems) {
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    div.textContent = `${label}：${value}`;
+    elements.backtestMeta.appendChild(div);
+  }
+
+  const summary = payload.summary || {};
+  const bestRows = (payload.best_trades || []).slice(0, 5).map((trade) => `
+    <tr>
+      <td>${escapeHtml(trade.code)}</td>
+      <td>${escapeHtml(trade.name)}</td>
+      <td>${formatYmd(trade.entry_date)}</td>
+      <td class="${Number(trade.ret_pct) >= 0 ? 'up-text' : 'down-text'}">${formatSignedPercent(trade.ret_pct)}</td>
+      <td class="${Number(trade.pnl) >= 0 ? 'up-text' : 'down-text'}">${formatMoney(trade.pnl)}</td>
+    </tr>`).join('');
+  const worstRows = (payload.worst_trades || []).slice(0, 5).map((trade) => `
+    <tr>
+      <td>${escapeHtml(trade.code)}</td>
+      <td>${escapeHtml(trade.name)}</td>
+      <td>${formatYmd(trade.entry_date)}</td>
+      <td class="${Number(trade.ret_pct) >= 0 ? 'up-text' : 'down-text'}">${formatSignedPercent(trade.ret_pct)}</td>
+      <td class="${Number(trade.pnl) >= 0 ? 'up-text' : 'down-text'}">${formatMoney(trade.pnl)}</td>
+    </tr>`).join('');
+
+  elements.backtestOutput.className = 'output-box rich-output';
+  elements.backtestOutput.innerHTML = `
+    <div class="backtest-summary-grid">
+      <div class="backtest-summary-card"><span>累計損益</span><strong class="${Number(summary.net_pnl_ntd) >= 0 ? 'up-text' : 'down-text'}">${formatMoney(summary.net_pnl_ntd)}</strong></div>
+      <div class="backtest-summary-card"><span>報酬率</span><strong class="${Number(summary.aggregate_roi_pct) >= 0 ? 'up-text' : 'down-text'}">${formatSignedPercent(summary.aggregate_roi_pct)}</strong></div>
+      <div class="backtest-summary-card"><span>勝率</span><strong>${formatSignedPercent(summary.win_rate_pct).replace('+', '')}</strong></div>
+      <div class="backtest-summary-card"><span>最大回撤</span><strong class="down-text">${formatMoney(summary.max_drawdown_ntd)}</strong></div>
+      <div class="backtest-summary-card"><span>成交筆數</span><strong>${escapeHtml(summary.trade_count)}</strong></div>
+      <div class="backtest-summary-card"><span>總候選數</span><strong>${escapeHtml(summary.selection_total_candidates)}</strong></div>
+      <div class="backtest-summary-card"><span>Profit Factor</span><strong>${summary.profit_factor ?? '—'}</strong></div>
+      <div class="backtest-summary-card"><span>平均持有</span><strong>${summary.avg_holding_days} 天</strong></div>
+    </div>
+
+    <h4 class="backtest-section-title">最佳 5 筆</h4>
+    <div class="backtest-table-wrap">
+      <table class="backtest-table">
+        <thead><tr><th>代號</th><th>名稱</th><th>進場日</th><th>報酬率</th><th>損益</th></tr></thead>
+        <tbody>${bestRows || '<tr><td colspan="5">—</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <h4 class="backtest-section-title">最差 5 筆</h4>
+    <div class="backtest-table-wrap">
+      <table class="backtest-table">
+        <thead><tr><th>代號</th><th>名稱</th><th>進場日</th><th>報酬率</th><th>損益</th></tr></thead>
+        <tbody>${worstRows || '<tr><td colspan="5">—</td></tr>'}</tbody>
+      </table>
+    </div>`;
+
+  setBacktestStatus('回測完成', 'success');
+}
+
 function fearGreedToneClass(rating) {
   const normalized = String(rating || '').toLowerCase();
   if (normalized.includes('extreme fear') || normalized === 'fear') return 'fear';
@@ -1476,6 +1599,61 @@ async function refreshCurrentView() {
   await loadCurrentResult();
 }
 
+async function runBacktest() {
+  if (!isBacktestFunction()) return;
+  const startDate = fromInputDate(elements.backtestStartDate.value);
+  const endDate = fromInputDate(elements.backtestEndDate.value);
+  const takeProfitPct = Number(elements.backtestTp.value);
+  const stopLossPct = Number(elements.backtestSl.value);
+
+  if (!startDate || !endDate) {
+    renderBacktestEmpty('請先填入開始與結束日期。');
+    setBacktestStatus('缺少日期', 'failed');
+    return;
+  }
+  if (startDate > endDate) {
+    renderBacktestEmpty('開始日期不可晚於結束日期。');
+    setBacktestStatus('日期錯誤', 'failed');
+    return;
+  }
+  if (!Number.isFinite(takeProfitPct) || takeProfitPct <= 0 || !Number.isFinite(stopLossPct) || stopLossPct <= 0) {
+    renderBacktestEmpty('停利 / 停損請輸入大於 0 的數字。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
+
+  elements.backtestRunButton.disabled = true;
+  setBacktestStatus('回測中...', 'running');
+  elements.backtestOutput.className = 'output-box empty';
+  elements.backtestOutput.innerHTML = '回測中，請稍候...';
+
+  try {
+    const response = await fetch(`/api/backtest/${encodeURIComponent(state.selectedKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: startDate,
+        end_date: endDate,
+        take_profit_pct: takeProfitPct,
+        stop_loss_pct: stopLossPct,
+        entry_band_pct: 3,
+        max_hold_days: 5,
+        shares: 1000,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || '回測失敗');
+    }
+    renderBacktest(payload);
+  } catch (error) {
+    setBacktestStatus('回測失敗', 'failed');
+    renderBacktestEmpty(String(error.message || error));
+  } finally {
+    elements.backtestRunButton.disabled = false;
+  }
+}
+
 async function selectFunction(key) {
   state.selectedKey = key;
   localStorage.setItem('stock-control-selected', key);
@@ -1488,6 +1666,17 @@ async function selectFunction(key) {
   elements.description.textContent = state.selectedFunction.description;
   elements.dateInput.disabled = !state.dates.length;
   renderActionButtons();
+  syncBacktestInputsFromDates();
+  if (isBacktestFunction()) {
+    if (!state.backtestResult || state.backtestResult.function_key !== state.selectedKey) {
+      renderBacktestEmpty();
+      setBacktestStatus('待命', 'neutral');
+    }
+  } else {
+    state.backtestResult = null;
+    renderBacktestEmpty('這個功能目前沒有回測面板。');
+    setBacktestStatus('待命', 'neutral');
+  }
 
   if (isFearGreedFunction()) {
     await loadFearGreedStatus();
@@ -1677,6 +1866,7 @@ async function init() {
 
   renderDateOptions();
   renderActionButtons();
+  syncBacktestInputsFromDates();
   checkUpdateStatus();
 
   elements.refreshButton.addEventListener('click', refreshCurrentView);
@@ -1684,6 +1874,7 @@ async function init() {
   elements.intradayButton.addEventListener('click', runIntraday);
   elements.refreshFutureButton.addEventListener('click', refreshFuture);
   elements.runButton.addEventListener('click', runSelectedFunction);
+  elements.backtestRunButton.addEventListener('click', runBacktest);
   elements.settingsButton.addEventListener('click', openSettingsModal);
   elements.selfUpdateButton.addEventListener('click', runSelfUpdate);
   elements.settingsClose.addEventListener('click', closeSettingsModal);

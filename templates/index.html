@@ -61,6 +61,37 @@
           <div id="latest-output" class="output-box empty">請先從左側點選功能。</div>
           <div id="artifact-list" class="artifact-list"></div>
         </article>
+
+        <article id="backtest-panel" class="panel-card backtest-panel" hidden>
+          <div class="panel-header">
+            <h3>回測</h3>
+          </div>
+          <div class="backtest-form-grid">
+            <label class="date-control">
+              <span>開始日期</span>
+              <input id="backtest-start-date" class="date-input" type="date">
+            </label>
+            <label class="date-control">
+              <span>結束日期</span>
+              <input id="backtest-end-date" class="date-input" type="date">
+            </label>
+            <label class="date-control">
+              <span>停利 %</span>
+              <input id="backtest-tp" class="date-input" type="number" step="0.1" min="0.1" value="10">
+            </label>
+            <label class="date-control">
+              <span>停損 %</span>
+              <input id="backtest-sl" class="date-input" type="number" step="0.1" min="0.1" value="5">
+            </label>
+          </div>
+          <div class="backtest-fixed-note">固定條件：隔日收盤 ±3% 內買進、1 張、最多持有 5 天、同日停利停損同時觸發時先算停損。</div>
+          <div class="backtest-actions">
+            <button id="backtest-run-button" class="primary-button">執行回測</button>
+            <span id="backtest-status-pill" class="status-pill neutral">待命</span>
+          </div>
+          <div id="backtest-meta" class="meta-list"></div>
+          <div id="backtest-output" class="output-box empty">標準選股 / 保守選股可在這裡直接回測。</div>
+        </article>
       </section>
     </main>
   </div>
