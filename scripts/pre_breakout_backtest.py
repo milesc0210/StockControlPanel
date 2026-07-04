@@ -127,7 +127,7 @@ def rank_score(grade, dist_ma5, pct, vol_ratio, up_days):
     return round(score, 2)
 
 
-def select_candidates(signal_date, relaxed, shared_dates, idx_of, series_by_code, prev40_high_cache):
+def select_candidates(signal_date, relaxed, shared_dates, idx_of, series_by_code, prev40_high_cache, top_n: int | None = None):
     signal_index = idx_of[signal_date]
     if signal_index < 11:
         return []
@@ -209,6 +209,8 @@ def select_candidates(signal_date, relaxed, shared_dates, idx_of, series_by_code
         )
 
     candidates.sort(key=lambda item: (-item["rank_score"], item["code"]))
+    if top_n and top_n > 0:
+        return candidates[:top_n]
     return candidates
 
 
@@ -239,7 +241,15 @@ def run_backtest(args):
         signal_index = idx_of[signal_date]
         if signal_index + 1 >= len(shared_dates):
             continue
-        candidates = select_candidates(signal_date, relaxed, shared_dates, idx_of, series_by_code, prev40_high_cache)
+        candidates = select_candidates(
+            signal_date,
+            relaxed,
+            shared_dates,
+            idx_of,
+            series_by_code,
+            prev40_high_cache,
+            top_n=args.top_n,
+        )
         selection_days.append({"signal_date": signal_date, "candidate_count": len(candidates)})
 
         entry_date = shared_dates[signal_index + 1]
@@ -376,8 +386,10 @@ def run_backtest(args):
             "take_profit_pct": args.take_profit_pct,
             "stop_loss_pct": args.stop_loss_pct,
             "entry_band_pct": args.entry_band_pct,
+            "top_n": args.top_n,
             "max_hold_days": args.max_hold_days,
             "shares": args.shares,
+            "grade_filter": "A",
             "entry_rule": "隔日收盤、相對訊號日收盤在 ±範圍內才買進",
             "same_day_rule": "同日若停利停損都觸發，先算停損",
             "position_size_label": f"{args.shares} 股",
@@ -419,6 +431,7 @@ def main():
     parser.add_argument("--take-profit-pct", type=float, default=10.0)
     parser.add_argument("--stop-loss-pct", type=float, default=5.0)
     parser.add_argument("--entry-band-pct", type=float, default=3.0)
+    parser.add_argument("--top-n", type=int, default=10)
     parser.add_argument("--max-hold-days", type=int, default=5)
     parser.add_argument("--shares", type=int, default=1000)
     args = parser.parse_args()

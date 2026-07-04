@@ -2072,6 +2072,7 @@ def api_backtest(function_key: str) -> Any:
     take_profit_pct = str(payload.get("take_profit_pct") or "10").strip()
     stop_loss_pct = str(payload.get("stop_loss_pct") or "5").strip()
     entry_band_pct = str(payload.get("entry_band_pct") or "3").strip()
+    top_n = str(payload.get("top_n") or "10").strip()
     max_hold_days = str(payload.get("max_hold_days") or "5").strip()
     shares = str(payload.get("shares") or "1000").strip()
     if not start_date:
@@ -2096,6 +2097,8 @@ def api_backtest(function_key: str) -> Any:
         stop_loss_pct,
         "--entry-band-pct",
         entry_band_pct,
+        "--top-n",
+        top_n,
         "--max-hold-days",
         max_hold_days,
         "--shares",

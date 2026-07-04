@@ -83,8 +83,16 @@
               <span>停損 %</span>
               <input id="backtest-sl" class="date-input" type="number" step="0.1" min="0.1" value="5">
             </label>
+            <label class="date-control">
+              <span>隔日收盤 ±% 內買進</span>
+              <input id="backtest-entry-band" class="date-input" type="number" step="0.1" min="0.1" value="3">
+            </label>
+            <label class="date-control">
+              <span>A級前幾名</span>
+              <input id="backtest-top-n" class="date-input" type="number" step="1" min="1" value="10">
+            </label>
           </div>
-          <div class="backtest-fixed-note">固定條件：隔日收盤 ±3% 內買進、1 張、最多持有 5 天、同日停利停損同時觸發時先算停損。</div>
+          <div class="backtest-fixed-note">固定條件：只回測 A 級、依排序分數取前 N 名、1 張、最多持有 5 天、同日停利停損同時觸發時先算停損。</div>
           <div class="backtest-actions">
             <button id="backtest-run-button" class="primary-button">執行回測</button>
             <span id="backtest-status-pill" class="status-pill neutral">待命</span>

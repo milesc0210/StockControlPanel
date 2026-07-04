@@ -55,6 +55,8 @@ const elements = {
   backtestEndDate: document.getElementById('backtest-end-date'),
   backtestTp: document.getElementById('backtest-tp'),
   backtestSl: document.getElementById('backtest-sl'),
+  backtestEntryBand: document.getElementById('backtest-entry-band'),
+  backtestTopN: document.getElementById('backtest-top-n'),
   backtestRunButton: document.getElementById('backtest-run-button'),
   backtestStatusPill: document.getElementById('backtest-status-pill'),
   backtestMeta: document.getElementById('backtest-meta'),
@@ -965,7 +967,8 @@ function renderBacktest(payload) {
     ['策略', payload.function_name],
     ['回測區間', `${formatYmd(payload.params.start_date)} ～ ${formatYmd(payload.params.end_date)}`],
     ['停利 / 停損', `${payload.params.take_profit_pct}% / ${payload.params.stop_loss_pct}%`],
-    ['固定條件', `±${payload.params.entry_band_pct}%、${payload.params.position_size_label}、最多 ${payload.params.max_hold_days} 天`],
+    ['買進條件', `隔日收盤 ±${payload.params.entry_band_pct}% 內`],
+    ['篩選條件', `${payload.params.grade_filter} 級、前 ${payload.params.top_n} 名、${payload.params.position_size_label}、最多 ${payload.params.max_hold_days} 天`],
   ];
   for (const [label, value] of metaItems) {
     const div = document.createElement('div');
@@ -1605,6 +1608,8 @@ async function runBacktest() {
   const endDate = fromInputDate(elements.backtestEndDate.value);
   const takeProfitPct = Number(elements.backtestTp.value);
   const stopLossPct = Number(elements.backtestSl.value);
+  const entryBandPct = Number(elements.backtestEntryBand.value);
+  const topN = Number(elements.backtestTopN.value);
 
   if (!startDate || !endDate) {
     renderBacktestEmpty('請先填入開始與結束日期。');
@@ -1618,6 +1623,16 @@ async function runBacktest() {
   }
   if (!Number.isFinite(takeProfitPct) || takeProfitPct <= 0 || !Number.isFinite(stopLossPct) || stopLossPct <= 0) {
     renderBacktestEmpty('停利 / 停損請輸入大於 0 的數字。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
+  if (!Number.isFinite(entryBandPct) || entryBandPct <= 0) {
+    renderBacktestEmpty('隔日收盤 ±% 請輸入大於 0 的數字。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
+  if (!Number.isInteger(topN) || topN <= 0) {
+    renderBacktestEmpty('A級前幾名請輸入大於 0 的整數。');
     setBacktestStatus('參數錯誤', 'failed');
     return;
   }
@@ -1636,7 +1651,8 @@ async function runBacktest() {
         end_date: endDate,
         take_profit_pct: takeProfitPct,
         stop_loss_pct: stopLossPct,
-        entry_band_pct: 3,
+        entry_band_pct: entryBandPct,
+        top_n: topN,
         max_hold_days: 5,
         shares: 1000,
       }),
