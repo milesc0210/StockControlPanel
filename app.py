@@ -50,6 +50,7 @@ UPDATE_TRACKED_PATHS = [
     "scripts/analyze_today_limitup_sector_groups.py",
     "scripts/screen_today_limitup.py",
     "scripts/pre_breakout_screen.py",
+    "scripts/pre_breakout_backtest.py",
     "scripts/twse_tpex_fetch.py",
 ]
 
