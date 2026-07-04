@@ -235,7 +235,8 @@ def run_backtest(args):
     selection_days = []
     tp_mul = 1 + args.take_profit_pct / 100.0
     sl_mul = 1 - args.stop_loss_pct / 100.0
-    entry_band = args.entry_band_pct / 100.0
+    entry_max_pct = args.entry_max_pct
+    entry_min_pct = args.entry_min_pct
 
     for signal_date in signal_dates:
         signal_index = idx_of[signal_date]
@@ -264,7 +265,7 @@ def run_backtest(args):
             signal_close = float(signal_bar["close"])
             entry_close = float(entry_bar["close"])
             entry_gap_pct = (entry_close / signal_close - 1) * 100
-            if abs(entry_gap_pct / 100.0) > entry_band:
+            if entry_gap_pct < entry_min_pct or entry_gap_pct > entry_max_pct:
                 skipped.append({"reason": "entry_out_of_band", "signal_date": signal_date, "code": code})
                 continue
 
@@ -385,12 +386,13 @@ def run_backtest(args):
             "end_date": args.end_date,
             "take_profit_pct": args.take_profit_pct,
             "stop_loss_pct": args.stop_loss_pct,
-            "entry_band_pct": args.entry_band_pct,
+            "entry_max_pct": args.entry_max_pct,
+            "entry_min_pct": args.entry_min_pct,
             "top_n": args.top_n,
             "max_hold_days": args.max_hold_days,
             "shares": args.shares,
             "grade_filter": "A",
-            "entry_rule": "隔日收盤、相對訊號日收盤在 ±範圍內才買進",
+            "entry_rule": "隔日收盤、相對訊號日收盤在自訂上下限範圍內才買進",
             "same_day_rule": "同日若停利停損都觸發，先算停損",
             "position_size_label": f"{args.shares} 股",
         },
@@ -430,7 +432,8 @@ def main():
     parser.add_argument("--end-date", required=True)
     parser.add_argument("--take-profit-pct", type=float, default=10.0)
     parser.add_argument("--stop-loss-pct", type=float, default=5.0)
-    parser.add_argument("--entry-band-pct", type=float, default=3.0)
+    parser.add_argument("--entry-max-pct", type=float, default=3.0)
+    parser.add_argument("--entry-min-pct", type=float, default=-3.0)
     parser.add_argument("--top-n", type=int, default=10)
     parser.add_argument("--max-hold-days", type=int, default=5)
     parser.add_argument("--shares", type=int, default=1000)

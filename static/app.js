@@ -55,7 +55,8 @@ const elements = {
   backtestEndDate: document.getElementById('backtest-end-date'),
   backtestTp: document.getElementById('backtest-tp'),
   backtestSl: document.getElementById('backtest-sl'),
-  backtestEntryBand: document.getElementById('backtest-entry-band'),
+  backtestEntryMax: document.getElementById('backtest-entry-max'),
+  backtestEntryMin: document.getElementById('backtest-entry-min'),
   backtestTopN: document.getElementById('backtest-top-n'),
   backtestRunButton: document.getElementById('backtest-run-button'),
   backtestStatusPill: document.getElementById('backtest-status-pill'),
@@ -967,7 +968,7 @@ function renderBacktest(payload) {
     ['策略', payload.function_name],
     ['回測區間', `${formatYmd(payload.params.start_date)} ～ ${formatYmd(payload.params.end_date)}`],
     ['停利 / 停損', `${payload.params.take_profit_pct}% / ${payload.params.stop_loss_pct}%`],
-    ['買進條件', `隔日收盤 ±${payload.params.entry_band_pct}% 內`],
+    ['買進條件', `隔日收盤 ${payload.params.entry_min_pct}% ～ +${payload.params.entry_max_pct}%`],
     ['篩選條件', `${payload.params.grade_filter} 級、前 ${payload.params.top_n} 名、${payload.params.position_size_label}、最多 ${payload.params.max_hold_days} 天`],
   ];
   for (const [label, value] of metaItems) {
@@ -1608,7 +1609,8 @@ async function runBacktest() {
   const endDate = fromInputDate(elements.backtestEndDate.value);
   const takeProfitPct = Number(elements.backtestTp.value);
   const stopLossPct = Number(elements.backtestSl.value);
-  const entryBandPct = Number(elements.backtestEntryBand.value);
+  const entryMaxPct = Number(elements.backtestEntryMax.value);
+  const entryMinPct = Number(elements.backtestEntryMin.value);
   const topN = Number(elements.backtestTopN.value);
 
   if (!startDate || !endDate) {
@@ -1626,8 +1628,13 @@ async function runBacktest() {
     setBacktestStatus('參數錯誤', 'failed');
     return;
   }
-  if (!Number.isFinite(entryBandPct) || entryBandPct <= 0) {
-    renderBacktestEmpty('隔日收盤 ±% 請輸入大於 0 的數字。');
+  if (!Number.isFinite(entryMaxPct) || !Number.isFinite(entryMinPct)) {
+    renderBacktestEmpty('隔日收盤上下限 % 請輸入數字。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
+  if (entryMinPct > entryMaxPct) {
+    renderBacktestEmpty('買進下限不可大於上限。');
     setBacktestStatus('參數錯誤', 'failed');
     return;
   }
@@ -1651,7 +1658,8 @@ async function runBacktest() {
         end_date: endDate,
         take_profit_pct: takeProfitPct,
         stop_loss_pct: stopLossPct,
-        entry_band_pct: entryBandPct,
+        entry_max_pct: entryMaxPct,
+        entry_min_pct: entryMinPct,
         top_n: topN,
         max_hold_days: 5,
         shares: 1000,

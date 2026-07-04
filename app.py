@@ -2068,13 +2068,23 @@ def api_backtest(function_key: str) -> Any:
 
     payload = request.get_json(silent=True) or {}
     start_date = str(payload.get("start_date") or "").strip()
-    end_date = str(payload.get("end_date") or latest_valid_shared_date()).strip()
-    take_profit_pct = str(payload.get("take_profit_pct") or "10").strip()
-    stop_loss_pct = str(payload.get("stop_loss_pct") or "5").strip()
-    entry_band_pct = str(payload.get("entry_band_pct") or "3").strip()
-    top_n = str(payload.get("top_n") or "10").strip()
-    max_hold_days = str(payload.get("max_hold_days") or "5").strip()
-    shares = str(payload.get("shares") or "1000").strip()
+    end_date_value = payload.get("end_date")
+    take_profit_value = payload.get("take_profit_pct")
+    stop_loss_value = payload.get("stop_loss_pct")
+    entry_max_value = payload.get("entry_max_pct")
+    entry_min_value = payload.get("entry_min_pct")
+    top_n_value = payload.get("top_n")
+    max_hold_value = payload.get("max_hold_days")
+    shares_value = payload.get("shares")
+
+    end_date = str(end_date_value if end_date_value not in (None, "") else latest_valid_shared_date()).strip()
+    take_profit_pct = str(take_profit_value if take_profit_value not in (None, "") else "10").strip()
+    stop_loss_pct = str(stop_loss_value if stop_loss_value not in (None, "") else "5").strip()
+    entry_max_pct = str(entry_max_value if entry_max_value not in (None, "") else "3").strip()
+    entry_min_pct = str(entry_min_value if entry_min_value not in (None, "") else "-3").strip()
+    top_n = str(top_n_value if top_n_value not in (None, "") else "10").strip()
+    max_hold_days = str(max_hold_value if max_hold_value not in (None, "") else "5").strip()
+    shares = str(shares_value if shares_value not in (None, "") else "1000").strip()
     if not start_date:
         return jsonify({"error": "缺少開始日期。"}), 400
 
@@ -2095,8 +2105,10 @@ def api_backtest(function_key: str) -> Any:
         take_profit_pct,
         "--stop-loss-pct",
         stop_loss_pct,
-        "--entry-band-pct",
-        entry_band_pct,
+        "--entry-max-pct",
+        entry_max_pct,
+        "--entry-min-pct",
+        entry_min_pct,
         "--top-n",
         top_n,
         "--max-hold-days",
