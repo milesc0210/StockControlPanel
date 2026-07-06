@@ -1396,6 +1396,9 @@ def write_settings_payload(finmind_token: str | None, fugle_intraday_api_key: st
 
 
 def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     return subprocess.run(
         command,
         cwd=MILES_AGENT_ROOT,
@@ -1404,6 +1407,7 @@ def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedP
         encoding="utf-8",
         errors="ignore",
         timeout=timeout,
+        env=env,
     )
 
 
