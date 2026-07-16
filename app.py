@@ -33,6 +33,7 @@ OUTPUT_ROOT = BASE_DIR / "outputs"
 DB_PATH = BASE_DIR / "stock_control_panel.db"
 ENV_FILE_PATH = BASE_DIR / ".env"
 PYTHON_BIN = sys.executable
+IS_FROZEN = bool(getattr(sys, "frozen", False))
 GITHUB_REPO_OWNER = "milesc0210"
 GITHUB_REPO_NAME = "StockControlPanel"
 GITHUB_ZIP_URL = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/archive/refs/heads/main.zip"
@@ -79,6 +80,14 @@ def load_env_file(path: Path = ENV_FILE_PATH, override: bool = False) -> None:
 
 
 load_env_file()
+
+
+def build_script_command(script_path: Path, *args: str) -> list[str]:
+    if IS_FROZEN:
+        relative_path = script_path.resolve().relative_to(MILES_AGENT_ROOT.resolve()).as_posix()
+        return [PYTHON_BIN, "--run-script", relative_path, *args]
+    return [PYTHON_BIN, str(script_path), *args]
+
 
 OUTPUT_WATCH_DIRS = [
     OUTPUT_ROOT,
@@ -359,7 +368,7 @@ def ensure_latest_market_data() -> dict[str, Any]:
             market_data_sync_state.update(status)
             return status
 
-        command = [PYTHON_BIN, str(SCRIPTS_DIR / "twse_tpex_fetch.py"), expected_date]
+        command = build_script_command(SCRIPTS_DIR / "twse_tpex_fetch.py", expected_date)
         result = subprocess.run(
             command,
             cwd=MILES_AGENT_ROOT,
@@ -672,23 +681,23 @@ def build_commands(spec: FunctionSpec, target_date: str | None = None) -> list[l
     scripts_dir = MILES_AGENT_ROOT / "scripts"
 
     if spec.key == "limit_up_red_arrow":
-        return [[PYTHON_BIN, str(scripts_dir / "screen_limitup_upperwick.py"), "--latest-date", latest_date, "--no-save"]]
+        return [build_script_command(scripts_dir / "screen_limitup_upperwick.py", "--latest-date", latest_date, "--no-save")]
     if spec.key == "today_limit_up":
         return [
-            [PYTHON_BIN, str(scripts_dir / "screen_today_limitup.py"), "--date", latest_date, "--no-save"],
-            [PYTHON_BIN, str(scripts_dir / "analyze_today_limitup_sector_groups.py"), "--date", latest_date, "--no-save"],
+            build_script_command(scripts_dir / "screen_today_limitup.py", "--date", latest_date, "--no-save"),
+            build_script_command(scripts_dir / "analyze_today_limitup_sector_groups.py", "--date", latest_date, "--no-save"),
         ]
     if spec.key == "ma_bullish_turning_point":
         return [
-            [PYTHON_BIN, str(scripts_dir / "screen_ma_alignment_turning_point.py"), "--latest-date", latest_date, "--no-save"],
-            [PYTHON_BIN, str(scripts_dir / "analyze_012_sector_groups.py"), "--latest-date", latest_date, "--no-save"],
+            build_script_command(scripts_dir / "screen_ma_alignment_turning_point.py", "--latest-date", latest_date, "--no-save"),
+            build_script_command(scripts_dir / "analyze_012_sector_groups.py", "--latest-date", latest_date, "--no-save"),
         ]
     if spec.key == "pre_breakout_standard":
         pre_breakout_script = resolve_pre_breakout_script()
-        return [[PYTHON_BIN, str(pre_breakout_script), "--date", latest_date, "--relaxed"]]
+        return [build_script_command(pre_breakout_script, "--date", latest_date, "--relaxed")]
     if spec.key == "pre_breakout_conservative":
         pre_breakout_script = resolve_pre_breakout_script()
-        return [[PYTHON_BIN, str(pre_breakout_script), "--date", latest_date]]
+        return [build_script_command(pre_breakout_script, "--date", latest_date)]
     return []
 
 
@@ -1436,6 +1445,17 @@ def build_remote_update_signature() -> str:
 
 
 def get_update_status() -> dict[str, Any]:
+    if IS_FROZEN:
+        return {
+            "ok": True,
+            "mode": "portable_exe",
+            "branch": "bundled",
+            "update_available": False,
+            "button_label": "EXE版請下載新版",
+            "button_enabled": False,
+            "message": "可攜式 EXE 版請直接下載新的發佈包覆蓋。",
+        }
+
     git_dir = MILES_AGENT_ROOT / ".git"
     if git_dir.exists():
         branch_result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
@@ -1968,6 +1988,8 @@ def api_settings() -> Any:
 
 @app.route("/api/self_update", methods=["POST"])
 def api_self_update() -> Any:
+    if IS_FROZEN:
+        return jsonify({"ok": False, "error": "可攜式 EXE 版不支援程式內自動更新，請直接下載新的發佈包。"}), 400
     try:
         result = update_project_from_github()
     except Exception as exc:
@@ -2096,9 +2118,8 @@ def api_backtest(function_key: str) -> Any:
     if not script_path.exists():
         return jsonify({"error": "找不到 pre_breakout_backtest.py。"}), 400
 
-    command = [
-        PYTHON_BIN,
-        str(script_path),
+    command = build_script_command(
+        script_path,
         "--function-key",
         function_key,
         "--start-date",
@@ -2119,7 +2140,7 @@ def api_backtest(function_key: str) -> Any:
         max_hold_days,
         "--shares",
         shares,
-    ]
+    )
     try:
         result = run_command(command, timeout=600)
     except Exception as exc:

@@ -12,6 +12,8 @@ venv/
 # Local runtime data
 stock_control_panel.db
 *.db
+logs/
+outputs/
 
 # OS / editor noise
 .DS_Store
@@ -19,8 +21,14 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Packaged duplicate / local release artifacts
-Release/
+# Portable EXE local build artifacts
+Release/PortableEXE/build/
+Release/PortableEXE/dist/
+Release/PortableEXE/spec/
+Release/PortableEXE/*.zip
+
+# Other packaged / local release artifacts
+Release/StockControlPanel/
 
 # Build / temp artifacts
 *.log
