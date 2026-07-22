@@ -56,6 +56,7 @@ class Candidate:
     ma5_prev: float
     ma10_prev: float
     ma20_prev: float
+    rank_score: float
     future_days: list[dict[str, object]]
 
 
@@ -88,6 +89,20 @@ def average(values: list[float]) -> float:
 
 def is_bullish_alignment(ma5: float, ma10: float, ma20: float) -> bool:
     return (ma5 - ma10) > EPS and (ma10 - ma20) > EPS
+
+
+def compute_rank_score(
+    volume_ratio: float,
+    close_price: float,
+    ma5: float,
+    ma10: float,
+    ma20: float,
+) -> float:
+    """均線多頭新成形分數：量能放大與多頭均線間距越明確，分數越高。"""
+    volume_score = min(max(volume_ratio - 1.0, 0.0), 3.0) * 2.0
+    ma_spread_pct = ((ma5 - ma10) + (ma10 - ma20)) / close_price * 100 if close_price > EPS else 0.0
+    spread_score = min(max(ma_spread_pct, 0.0), 5.0) * 1.2
+    return round(4.0 + volume_score + spread_score, 2)
 
 
 def is_valid_twse_file(path: Path) -> bool:
@@ -352,6 +367,13 @@ def screen(latest_date: str) -> tuple[str, list[Candidate]]:
                 ma5_prev=round(ma5_prev, 4),
                 ma10_prev=round(ma10_prev, 4),
                 ma20_prev=round(ma20_prev, 4),
+                rank_score=compute_rank_score(
+                    volume_ratio_vs_prev,
+                    latest_bar.close,
+                    ma5_latest,
+                    ma10_latest,
+                    ma20_latest,
+                ),
                 future_days=future_days,
             )
         )
@@ -399,7 +421,8 @@ def print_summary(latest_date: str, prev_date: str, candidates: list[Candidate],
 
         print(
             f"{item.market.upper():4s} {item.code} {item.name} | "
-            f"C={item.latest_close:.2f} V={item.latest_volume_lots:.3f}張 倍數={item.volume_ratio_vs_prev:.2f} | "
+            f"C={item.latest_close:.2f} V={item.latest_volume_lots:.3f}張 倍數={item.volume_ratio_vs_prev:.2f} "
+            f"分數={item.rank_score:.2f} | "
             f"後5日={future_text}"
         )
 

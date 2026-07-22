@@ -838,7 +838,10 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
         return None
 
     output_text = row["output_text"] or ""
-    if function_key in {"limit_up_red_arrow", "today_limit_up", "ma_bullish_turning_point"} and "後5日=" not in output_text:
+    if (
+        function_key in {"limit_up_red_arrow", "today_limit_up", "ma_bullish_turning_point"}
+        and ("後5日=" not in output_text or "分數=" not in output_text)
+    ):
         return None
     if function_key == "today_limit_up" and "策略：今日漲停 快速族群分析" not in output_text:
         return None
@@ -1020,7 +1023,7 @@ def parse_pre_breakout_candidates(output_text: str) -> list[dict[str, str]]:
 
 def parse_limit_up_candidates(output_text: str) -> list[dict[str, str]]:
     pattern = re.compile(
-        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+)張(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+\|\s+後5日=(.+))?$"
+        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+)張(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+分數=([\d.]+))?(?:\s+\|\s+後5日=(.+))?$"
     )
     stocks: list[dict[str, str]] = []
     for raw_line in output_text.splitlines():
@@ -1041,7 +1044,7 @@ def parse_limit_up_candidates(output_text: str) -> list[dict[str, str]]:
 
 def parse_ma_bullish_candidates(output_text: str) -> list[dict[str, str]]:
     pattern = re.compile(
-        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+C=([\d.]+)\s+V=([\d.]+)張\s+倍數=([\d.]+)\s+\|\s+後5日=(.+)$"
+        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+C=([\d.]+)\s+V=([\d.]+)張\s+倍數=([\d.]+)(?:\s+分數=([\d.]+))?\s+\|\s+後5日=(.+)$"
     )
     stocks: list[dict[str, str]] = []
     for raw_line in output_text.splitlines():

@@ -68,6 +68,7 @@ class Candidate:
     latest_upper_shadow: float
     latest_body: float
     latest_upper_shadow_ratio: float | None
+    rank_score: float
     future_days: list[dict[str, object]]
 
 
@@ -314,6 +315,22 @@ def has_min_volume_lots(bar: DailyBar, min_lots: int = MIN_VOLUME_LOTS) -> bool:
     return (bar.volume_shares / 1000.0) >= min_lots
 
 
+def compute_rank_score(
+    volume_lots: float,
+    body: float,
+    close_price: float,
+    upper_shadow_ratio: float | None,
+) -> float:
+    """漲停紅箭排序分數：兼顧量能、紅K實體與適中的上影線。"""
+    volume_multiple = max(volume_lots / MIN_VOLUME_LOTS, 0.0)
+    volume_score = min(volume_multiple, 4.0) * 1.25
+    body_pct = (body / close_price) * 100 if close_price > EPS else 0.0
+    body_score = min(max(body_pct, 0.0), 5.0) * 0.8
+    ratio = max(upper_shadow_ratio or 0.0, 0.0)
+    shadow_quality_score = max(0.0, 2.0 - abs(ratio - 0.5))
+    return round(4.0 + volume_score + body_score + shadow_quality_score, 2)
+
+
 def build_future_days(
     code: str,
     base_close: float,
@@ -389,11 +406,17 @@ def screen(latest_date: str, prev_date: str, prev_prev_date: str) -> list[Candid
                 latest_upper_shadow=round(upper_shadow, 4),
                 latest_body=round(body, 4),
                 latest_upper_shadow_ratio=round(ratio, 4) if ratio is not None else None,
+                rank_score=compute_rank_score(
+                    latest_bar.volume_shares / 1000.0,
+                    body,
+                    latest_bar.close,
+                    ratio,
+                ),
                 future_days=build_future_days(code, latest_bar.close, future_dates, future_maps),
             )
         )
 
-    return sorted(candidates, key=lambda x: (x.market, x.code))
+    return sorted(candidates, key=lambda x: (-x.rank_score, x.market, x.code))
 
 
 def write_output(latest_date: str, prev_date: str, prev_prev_date: str, candidates: Iterable[Candidate]) -> Path:
@@ -435,7 +458,8 @@ def print_summary(latest_date: str, prev_date: str, candidates: list[Candidate],
             f"{prev_date} 漲停={item.prev_close:.2f} | "
             f"{latest_date} O={item.latest_open:.2f} H={item.latest_high:.2f} "
             f"L={item.latest_low:.2f} C={item.latest_close:.2f} V={item.latest_volume_lots:.3f}張 | "
-            f"上影={item.latest_upper_shadow:.2f} 實體={item.latest_body:.2f} 比={ratio_text} | "
+            f"上影={item.latest_upper_shadow:.2f} 實體={item.latest_body:.2f} 比={ratio_text} "
+            f"分數={item.rank_score:.2f} | "
             f"後5日={future_text}"
         )
 

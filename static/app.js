@@ -766,9 +766,9 @@ function parseLimitUpOutput(text) {
     if (line.startsWith('比較區間：')) summary.range = line.replace('比較區間：', '').trim();
     if (line.startsWith('參考前日：')) summary.referenceDate = line.replace('參考前日：', '').trim();
     if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
-    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+張)(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+\|\s+後5日=(.+))?$/);
+    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+張)(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+分數=([\d.]+))?(?:\s+\|\s+後5日=(.+))?$/);
     if (match) {
-      const futureText = (match[9] || '').trim();
+      const futureText = (match[10] || '').trim();
       const futureDays = futureText === '(無後續資料)'
         ? []
         : futureText.split(/,\s*/).map((entry) => {
@@ -800,6 +800,7 @@ function parseLimitUpOutput(text) {
         name: match[3],
         close: match[4],
         volume: floorVolumeText(match[5]),
+        rankScore: match[9] || '',
         futureDays,
       });
     }
@@ -861,9 +862,9 @@ function parseMaBullishOutput(text) {
     if (line.startsWith('比較區間：')) summary.range = line.replace('比較區間：', '').trim();
     if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
 
-    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+C=([\d.]+)\s+V=([\d.]+)張\s+倍數=([\d.]+)\s+\|\s+後5日=(.+)$/);
+    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+C=([\d.]+)\s+V=([\d.]+)張\s+倍數=([\d.]+)(?:\s+分數=([\d.]+))?\s+\|\s+後5日=(.+)$/);
     if (match) {
-      const futureRaw = match[7].trim();
+      const futureRaw = match[8].trim();
       const futureDays = futureRaw === '(無後續資料)'
         ? []
         : futureRaw.split(/\s*,\s*/).map((chunk) => {
@@ -884,6 +885,7 @@ function parseMaBullishOutput(text) {
         close: match[4],
         volume: floorVolumeText(match[5]),
         multiple: match[6],
+        rankScore: match[7] || '',
         futureDays,
       });
     }
@@ -971,6 +973,15 @@ function enrichMaBullishStocks(stocks, sector) {
       if (aOrder !== bOrder) return aOrder - bOrder;
       return a._originalIndex - b._originalIndex;
     });
+}
+
+function sortStocksByRankScore(stocks) {
+  return [...stocks].sort((a, b) => {
+    const aScore = Number(a.rankScore || 0);
+    const bScore = Number(b.rankScore || 0);
+    if (aScore !== bScore) return bScore - aScore;
+    return (a._originalIndex || 0) - (b._originalIndex || 0);
+  });
 }
 
 function renderPlainOutput(text, tone = 'normal') {
@@ -1275,7 +1286,8 @@ function buildSummaryChips(summary) {
 }
 
 function renderLimitUp(parsed) {
-  const stocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
+  const enrichedStocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
+  const stocks = sortStocksByRankScore(enrichedStocks);
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
   const showIntradayColumns = isIntradayFunction();
@@ -1294,7 +1306,7 @@ function renderLimitUp(parsed) {
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
   const extraIntradayColumns = showIntradayColumns ? 2 : 0;
-  const totalColumns = (parsed.sector ? 1 : 0) + 5 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
+  const totalColumns = (parsed.sector ? 1 : 0) + 6 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
   const intradayStatus = showIntradayColumns
     ? (intradaySummary
         ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
@@ -1311,7 +1323,7 @@ function renderLimitUp(parsed) {
   if (parsed.sector) {
     html += '<th>族群</th>';
   }
-  html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
+  html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
   if (showIntradayColumns) {
     html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
   }
@@ -1324,19 +1336,13 @@ function renderLimitUp(parsed) {
   }
   html += '</tr></thead><tbody>';
 
-  let currentTheme = null;
   for (const stock of stocks) {
     const intraday = intradayMap[stock.code] || {};
-    if (parsed.sector && stock.themeName && stock.themeName !== currentTheme) {
-      currentTheme = stock.themeName;
-      const themeMeta = parsed.sector?.themeRows?.find((row) => row.themeName === stock.themeName);
-      const themeLabel = themeMeta ? `${themeMeta.themeName}｜${themeMeta.count} 檔` : stock.themeName;
-      html += `<tr class="group-divider-row"><td colspan="${totalColumns}"><div class="group-divider-label">${escapeHtml(themeLabel)}</div></td></tr>`;
-    }
     html += '<tr>';
     if (parsed.sector) {
       html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
     }
+    html += `<td class="td-number td-score">${escapeHtml(stock.rankScore || '—')}</td>`;
     html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
     html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
     html += buildInlineKlineSlot(stock);
@@ -1494,7 +1500,7 @@ function renderMaBullish(parsed) {
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
   const extraIntradayColumns = showIntradayColumns ? 2 : 0;
-  const totalColumns = 7 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
+  const totalColumns = 8 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
   const intradayStatus = showIntradayColumns
     ? (intradaySummary
         ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
@@ -1508,7 +1514,7 @@ function renderMaBullish(parsed) {
     '即時行情': intradayStatus,
   })}</div>`;
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
-  html += '<th>族群</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">量能倍數</th>';
+  html += '<th>族群</th><th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">量能倍數</th>';
   if (showIntradayColumns) {
     html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
   }
@@ -1533,6 +1539,7 @@ function renderMaBullish(parsed) {
 
     html += '<tr>';
     html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
+    html += `<td class="td-number td-score">${escapeHtml(stock.rankScore || '—')}</td>`;
     html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
     html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
     html += buildInlineKlineSlot(stock);

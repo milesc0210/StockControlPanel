@@ -62,6 +62,7 @@ class Candidate:
     latest_close: float
     latest_volume_shares: int
     latest_volume_lots: float
+    rank_score: float
     future_days: list[dict[str, object]]
 
 
@@ -285,6 +286,15 @@ def has_min_volume_lots(bar: DailyBar, min_lots: int = MIN_VOLUME_LOTS) -> bool:
     return (bar.volume_shares / 1000.0) > min_lots
 
 
+def compute_rank_score(volume_lots: float, open_price: float, close_price: float) -> float:
+    """今日漲停排序分數：量能越強、由開盤推升至漲停的幅度越大，分數越高。"""
+    volume_multiple = max(volume_lots / MIN_VOLUME_LOTS, 0.0)
+    volume_score = min(volume_multiple, 4.0) * 1.25
+    intraday_gain_pct = ((close_price - open_price) / open_price) * 100 if open_price > EPS else 0.0
+    strength_score = min(max(intraday_gain_pct, 0.0), 10.0) * 0.4
+    return round(4.0 + volume_score + strength_score, 2)
+
+
 def build_future_days(
     code: str,
     base_close: float,
@@ -348,11 +358,16 @@ def screen(latest_date: str, prev_date: str) -> list[Candidate]:
                 latest_close=latest_bar.close,
                 latest_volume_shares=latest_bar.volume_shares,
                 latest_volume_lots=round(latest_bar.volume_shares / 1000.0, 3),
+                rank_score=compute_rank_score(
+                    latest_bar.volume_shares / 1000.0,
+                    latest_bar.open,
+                    latest_bar.close,
+                ),
                 future_days=build_future_days(code, latest_bar.close, future_dates, future_maps),
             )
         )
 
-    return sorted(candidates, key=lambda item: (-item.latest_volume_shares, item.market, item.code))
+    return sorted(candidates, key=lambda item: (-item.rank_score, item.market, item.code))
 
 
 def write_output(latest_date: str, prev_date: str, candidates: Iterable[Candidate]) -> Path:
@@ -391,7 +406,8 @@ def print_summary(latest_date: str, prev_date: str, candidates: list[Candidate],
             f"{item.market.upper():4s} {item.code} {item.name} | "
             f"{latest_date} 漲停={item.limit_up_price:.2f} | "
             f"{latest_date} O={item.latest_open:.2f} H={item.latest_high:.2f} "
-            f"L={item.latest_low:.2f} C={item.latest_close:.2f} V={item.latest_volume_lots:.3f}張 | "
+            f"L={item.latest_low:.2f} C={item.latest_close:.2f} V={item.latest_volume_lots:.3f}張 "
+            f"分數={item.rank_score:.2f} | "
             f"後5日={future_text}"
         )
 
