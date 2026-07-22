@@ -164,6 +164,76 @@ input {
   gap: 18px;
 }
 
+.fear-greed-page-title {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.fear-greed-market-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.fear-greed-market-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  padding: 18px;
+}
+
+.fear-greed-market-card.unavailable {
+  border-style: dashed;
+}
+
+.fear-greed-market-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fear-greed-market-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.fear-greed-market-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.fear-greed-market-meta a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.fear-greed-market-meta a:hover {
+  text-decoration: underline;
+}
+
+.fear-greed-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.fear-greed-link-button:hover {
+  background: #1d4ed8;
+}
+
 .fear-greed-summary {
   display: grid;
   grid-template-columns: 140px 1fr;
@@ -621,6 +691,74 @@ input {
 .intraday-btn:hover {
   background: #fff6e9;
   border-color: #ffc266;
+}
+
+.serenity-btn {
+  color: #5f3dc4;
+  border-color: #cfc1ff;
+  background: #f4f0ff;
+  font-weight: 800;
+}
+
+.serenity-btn:hover {
+  color: #4b2aa6;
+  background: #ebe4ff;
+  border-color: #a991f2;
+}
+
+.serenity-panel {
+  min-height: 260px;
+  border-color: #dcd2ff;
+  background: linear-gradient(180deg, #ffffff 0%, #faf8ff 100%);
+}
+
+.serenity-panel .panel-header {
+  align-items: flex-start;
+}
+
+.serenity-panel .eyebrow {
+  color: #7254c7;
+  margin-bottom: 5px;
+}
+
+.serenity-output {
+  border: 1px solid #ded6f5;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #243047;
+  overflow: auto;
+}
+
+.serenity-output pre {
+  margin: 0;
+  padding: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #243047;
+}
+
+.serenity-loading {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  white-space: pre-line;
+  color: #5f3dc4;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f7f4ff 0%, #eef4ff 100%);
+}
+
+.serenity-error {
+  border-color: #f0c7cd;
+  background: #fff6f7;
+}
+
+.serenity-error pre {
+  color: #9c2f3f;
 }
 
 .refresh-future-btn:hover {

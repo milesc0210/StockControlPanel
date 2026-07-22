@@ -51,6 +51,7 @@
           <div class="panel-header">
             <h3>結果</h3>
             <div class="panel-header-actions">
+              <button id="serenity-button" class="text-button serenity-btn" hidden>Serenity 深度分析</button>
               <button id="institutional-button" class="text-button institutional-btn" hidden>跑法人</button>
               <button id="intraday-button" class="text-button intraday-btn" hidden>即時行情</button>
               <button id="refresh-future-button" class="text-button refresh-future-btn" title="跳過快取，強制重新執行這個日期的選股">強制重跑</button>
@@ -60,6 +61,18 @@
           <div id="latest-meta" class="meta-list"></div>
           <div id="latest-output" class="output-box empty">請先從左側點選功能。</div>
           <div id="artifact-list" class="artifact-list"></div>
+        </article>
+
+        <article id="serenity-panel" class="panel-card serenity-panel" hidden>
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Supply-chain research</p>
+              <h3>Serenity 深度分析</h3>
+            </div>
+            <span id="serenity-status-pill" class="status-pill neutral">待命</span>
+          </div>
+          <div id="serenity-meta" class="meta-list"></div>
+          <div id="serenity-output" class="serenity-output empty-block">按上方「Serenity 深度分析」，會把目前候選股送給 Hermes 進行供應鏈瓶頸研究。</div>
         </article>
 
         <article id="backtest-panel" class="panel-card backtest-panel" hidden>

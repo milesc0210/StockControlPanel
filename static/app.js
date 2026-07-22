@@ -8,6 +8,8 @@ const state = {
   currentKlineCode: '',
   fearGreed: null,
   backtestResult: null,
+  serenityResult: null,
+  serenityProgressTimer: null,
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
   selfUpdateProgressTimer: null,
   updateStatusChecked: false,
@@ -26,6 +28,11 @@ const elements = {
   latestOutput: document.getElementById('latest-output'),
   artifactList: document.getElementById('artifact-list'),
   refreshButton: document.getElementById('refresh-button'),
+  serenityButton: document.getElementById('serenity-button'),
+  serenityPanel: document.getElementById('serenity-panel'),
+  serenityStatusPill: document.getElementById('serenity-status-pill'),
+  serenityMeta: document.getElementById('serenity-meta'),
+  serenityOutput: document.getElementById('serenity-output'),
   institutionalButton: document.getElementById('institutional-button'),
   intradayButton: document.getElementById('intraday-button'),
   refreshFutureButton: document.getElementById('refresh-future-button'),
@@ -192,14 +199,65 @@ function getIntradayMap() {
   return state.currentRun?.intraday?.payload?.quotes || {};
 }
 
+function getCurrentSerenityStocks() {
+  if (!state.currentRun || state.currentRun.status !== 'success') return [];
+  const text = state.currentRun.output_text || '';
+  let parsed = parsePreBreakoutOutput(text);
+  let stocks = parsed?.stocks || [];
+
+  if (!stocks.length) {
+    parsed = parseLimitUpOutput(text);
+    stocks = parsed ? enrichMaBullishStocks(parsed.stocks, parsed.sector) : [];
+  }
+  if (!stocks.length) {
+    parsed = parseMaBullishOutput(text);
+    stocks = parsed ? enrichMaBullishStocks(parsed.stocks, parsed.sector) : [];
+  }
+
+  return stocks.slice(0, 30).map((stock) => ({
+    code: stock.code || '',
+    name: stock.name || '',
+    theme: stock.themeName || '',
+    grade: stock.grade || '',
+    rank_score: stock.rankScore || '',
+    close: stock.close || '',
+    volume: stock.volume || '',
+  })).filter((stock) => stock.code);
+}
+
+function setSerenityStatus(text, tone = 'neutral') {
+  elements.serenityStatusPill.textContent = text;
+  elements.serenityStatusPill.className = `status-pill ${tone}`;
+}
+
+function resetSerenityPanel(message = '按上方「Serenity 深度分析」，會把目前候選股送給 Hermes 進行供應鏈瓶頸研究。') {
+  if (state.serenityProgressTimer) {
+    clearInterval(state.serenityProgressTimer);
+    state.serenityProgressTimer = null;
+  }
+  state.serenityResult = null;
+  elements.serenityMeta.innerHTML = '';
+  elements.serenityOutput.className = 'serenity-output empty-block';
+  elements.serenityOutput.textContent = message;
+  setSerenityStatus('待命', 'neutral');
+}
+
 function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
+  const showSerenity = !isFearGreed && Boolean(state.selectedFunction?.executable);
+  const serenityStocks = getCurrentSerenityStocks();
   const showInstitutional = !isFearGreed && isPreBreakoutFunction() && Boolean(state.selectedDate);
   const showIntraday = !isFearGreed && isIntradayFunction() && Boolean(state.selectedDate);
   const showBacktest = !isFearGreed && isBacktestFunction();
   elements.dateControlWrap.hidden = isFearGreed;
   elements.runButton.hidden = !state.selectedFunction?.executable;
   elements.refreshFutureButton.hidden = isFearGreed || !state.selectedFunction?.executable;
+  elements.serenityButton.hidden = !showSerenity;
+  elements.serenityPanel.hidden = !showSerenity;
+  elements.serenityButton.disabled = !serenityStocks.length;
+  elements.serenityButton.title = serenityStocks.length
+    ? `分析目前 ${serenityStocks.length} 檔候選股`
+    : '請先執行選股，產生候選股票後才能分析';
   elements.institutionalButton.hidden = !showInstitutional;
   elements.intradayButton.hidden = !showIntraday;
   elements.intradayButton.disabled = !isIntradayAvailable();
@@ -1081,10 +1139,11 @@ function buildFearGreedChart(payload) {
   const latest = points[points.length - 1];
   const latestX = xAt(points.length - 1).toFixed(2);
   const latestY = yAt(latest.score).toFixed(2);
+  const chartLabel = `${payload.market_label || payload.source || '恐懼與貪婪指數'}過去一年走勢圖`;
 
   return `
     <div class="fear-greed-chart-wrap">
-      <svg viewBox="0 0 ${width} ${height}" class="fear-greed-chart" role="img" aria-label="CNN 恐懼與貪婪指數過去一年走勢圖">
+      <svg viewBox="0 0 ${width} ${height}" class="fear-greed-chart" role="img" aria-label="${escapeHtml(chartLabel)}">
         <rect x="0" y="0" width="${width}" height="${height}" rx="18" ry="18" class="chart-bg"></rect>
         ${thresholdLines}
         <polyline points="${linePoints}" class="history-line"></polyline>
@@ -1101,23 +1160,33 @@ function buildFearGreedChart(payload) {
   `;
 }
 
-function renderFearGreed(payload) {
-  state.currentRun = null;
-  state.fearGreed = payload;
-  elements.latestMeta.innerHTML = '';
-  elements.artifactList.innerHTML = '';
+function renderFearGreedMarket(payload) {
+  const sourceHtml = payload.source_url
+    ? `<a href="${escapeHtml(payload.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.source || '來源連結')}</a>`
+    : escapeHtml(payload.source || '—');
+  const metaHtml = `
+    <div class="fear-greed-market-meta">
+      <span>來源：${sourceHtml}</span>
+      <span>更新：${escapeHtml(payload.updated_at || '—')}</span>
+    </div>
+  `;
 
-  const metaItems = [
-    ['資料來源', payload.source || 'CNN'],
-    ['更新時間', payload.updated_at || '—'],
-    ['抓取時間', compactTimestamp(payload.fetched_at)],
-    ['快取', payload.from_cache ? '是' : '否'],
-  ];
-  for (const [label, value] of metaItems) {
-    const div = document.createElement('div');
-    div.className = 'meta-item';
-    div.textContent = `${label}：${value}`;
-    elements.latestMeta.appendChild(div);
+  if (!payload.available) {
+    const linkHtml = payload.source_url
+      ? `<a class="fear-greed-link-button" href="${escapeHtml(payload.source_url)}" target="_blank" rel="noopener noreferrer">前往 MacroMicro 查看</a>`
+      : '';
+    return `
+      <section class="fear-greed-market-card unavailable">
+        <div class="fear-greed-market-header">
+          <div>
+            <div class="fear-greed-market-title">${escapeHtml(payload.market_label || payload.source || '情緒指數')}</div>
+            ${metaHtml}
+          </div>
+        </div>
+        <div class="fear-greed-chart-empty">${escapeHtml(payload.error_message || '目前暫時抓不到資料。')}</div>
+        ${linkHtml}
+      </section>
+    `;
   }
 
   const recommendation = payload.recommendation || { action: 'hold', label: '觀察', message: '—' };
@@ -1128,33 +1197,68 @@ function renderFearGreed(payload) {
     </div>
   `).join('');
 
+  return `
+    <section class="fear-greed-market-card">
+      <div class="fear-greed-market-header">
+        <div>
+          <div class="fear-greed-market-title">${escapeHtml(payload.market_label || payload.source || '情緒指數')}</div>
+          ${metaHtml}
+        </div>
+      </div>
+
+      <section class="fear-greed-summary ${fearGreedToneClass(payload.rating)}">
+        <div class="fear-greed-score-wrap">
+          <div class="fear-greed-score">${escapeHtml(formatFearGreedScore(payload.score))}</div>
+          <div class="fear-greed-rating">${escapeHtml(payload.rating || '—')}</div>
+        </div>
+        <div class="fear-greed-summary-text">
+          <div class="fear-greed-headline">${escapeHtml(payload.status_text || '')}</div>
+          <div class="fear-greed-subtitle">只看過去 1 年走勢，並用 25 / 75 當作判讀區間。</div>
+        </div>
+      </section>
+
+      <section class="fear-greed-advice ${fearGreedActionTone(recommendation.action)}">
+        <div class="fear-greed-advice-title">操作提醒：${escapeHtml(recommendation.label)}</div>
+        <div class="fear-greed-advice-text">${escapeHtml(recommendation.message)}</div>
+      </section>
+
+      <section class="fear-greed-history-panel">
+        <div class="fear-greed-panel-title">過去 1 年指數走勢</div>
+        ${buildFearGreedChart(payload)}
+      </section>
+
+      <section class="fear-greed-history-grid">${historyCards}</section>
+    </section>
+  `;
+}
+
+function renderFearGreed(payload) {
+  state.currentRun = null;
+  state.fearGreed = payload;
+  elements.latestMeta.innerHTML = '';
+  elements.artifactList.innerHTML = '';
+
+  const metaItems = [
+    ['資料頁', '美國 + 台灣'],
+    ['抓取時間', compactTimestamp(payload.fetched_at)],
+    ['快取', payload.from_cache ? '是' : '否'],
+  ];
+  for (const [label, value] of metaItems) {
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    div.textContent = `${label}：${value}`;
+    elements.latestMeta.appendChild(div);
+  }
+
+  const markets = Array.isArray(payload.markets) ? payload.markets : [];
   elements.latestOutput.className = 'output-box fear-greed-output';
   elements.latestOutput.innerHTML = `
-    <section class="fear-greed-summary ${fearGreedToneClass(payload.rating)}">
-      <div class="fear-greed-score-wrap">
-        <div class="fear-greed-score">${escapeHtml(formatFearGreedScore(payload.score))}</div>
-        <div class="fear-greed-rating">${escapeHtml(payload.rating)}</div>
-      </div>
-      <div class="fear-greed-summary-text">
-        <div class="fear-greed-headline">${escapeHtml(payload.status_text || '')}</div>
-        <div class="fear-greed-subtitle">只看過去 1 年走勢，並用 25 / 75 當作判讀區間。</div>
-      </div>
-    </section>
-
-    <section class="fear-greed-advice ${fearGreedActionTone(recommendation.action)}">
-      <div class="fear-greed-advice-title">操作提醒：${escapeHtml(recommendation.label)}</div>
-      <div class="fear-greed-advice-text">${escapeHtml(recommendation.message)}</div>
-    </section>
-
-    <section class="fear-greed-history-panel">
-      <div class="fear-greed-panel-title">過去 1 年指數走勢</div>
-      ${buildFearGreedChart(payload)}
-    </section>
-
-    <section class="fear-greed-history-grid">${historyCards}</section>
+    <div class="fear-greed-page-title">同頁查看美國 CNN 與台灣 MM 的恐懼與貪婪指數，圖表都只顯示 1 年內範圍。</div>
+    <div class="fear-greed-market-grid">${markets.map(renderFearGreedMarket).join('')}</div>
   `;
 
-  setStatus(payload.from_cache ? '已載入情緒快取' : '情緒指數已更新', 'success');
+  const hasUnavailable = markets.some((item) => item && item.available === false);
+  setStatus(hasUnavailable ? '部分情緒資料已更新' : (payload.from_cache ? '已載入情緒快取' : '情緒指數已更新'), hasUnavailable ? 'running' : 'success');
 }
 
 function gradeTone(grade) {
@@ -1582,15 +1686,15 @@ async function loadFearGreedStatus(forceRefresh = false) {
   elements.artifactList.innerHTML = '';
   elements.latestOutput.className = 'output-box empty';
   elements.latestOutput.innerHTML = forceRefresh
-    ? '正在重新抓取 CNN 恐懼與貪婪指數，請稍候...'
-    : '正在載入 CNN 恐懼與貪婪指數，請稍候...';
+    ? '正在重新抓取美國 / 台灣恐懼與貪婪指數，請稍候...'
+    : '正在載入美國 / 台灣恐懼與貪婪指數，請稍候...';
 
   const query = new URLSearchParams();
   if (forceRefresh) query.set('force_refresh', '1');
   const response = await fetch(`/api/fear_greed?${query.toString()}`);
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || '讀取 CNN 恐懼與貪婪指數失敗');
+    throw new Error(payload.error || '讀取美國 / 台灣恐懼與貪婪指數失敗');
   }
   renderFearGreed(payload);
 }
@@ -1678,10 +1782,84 @@ async function runBacktest() {
   }
 }
 
+async function runSerenityAnalysis() {
+  if (!state.selectedFunction?.executable) return;
+  const stocks = getCurrentSerenityStocks();
+  if (!stocks.length) {
+    resetSerenityPanel('目前結果沒有可分析的候選股票，請先執行選股。');
+    setSerenityStatus('沒有候選股', 'failed');
+    return;
+  }
+
+  const progressSteps = [
+    '整理候選股與族群...',
+    '搜尋產業鏈公開資料...',
+    '尋找供應鏈瓶頸...',
+    '比對公司證據與風險...',
+    '產生研究優先順序...',
+  ];
+  let progressIndex = 0;
+  elements.serenityButton.disabled = true;
+  elements.serenityPanel.hidden = false;
+  elements.serenityMeta.innerHTML = '';
+  elements.serenityOutput.className = 'serenity-output serenity-loading';
+  elements.serenityOutput.textContent = `${progressSteps[0]}\n深度分析通常需要數分鐘，請保持程式開啟。`;
+  setSerenityStatus('分析中...', 'running');
+  state.serenityProgressTimer = window.setInterval(() => {
+    progressIndex = (progressIndex + 1) % progressSteps.length;
+    elements.serenityOutput.textContent = `${progressSteps[progressIndex]}\n深度分析通常需要數分鐘，請保持程式開啟。`;
+  }, 4000);
+
+  try {
+    const response = await fetch(`/api/serenity/${encodeURIComponent(state.selectedKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        result_date: state.selectedDate,
+        stocks,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Serenity 深度分析失敗');
+    }
+
+    state.serenityResult = payload;
+    elements.serenityMeta.innerHTML = '';
+    const metaItems = [
+      ['選股功能', payload.function_name],
+      ['交易日', formatYmd(payload.result_date)],
+      ['候選股', `${payload.stock_count} 檔`],
+      ['分析時間', compactTimestamp(payload.generated_at)],
+      ['耗時', formatDuration(Number(payload.duration_seconds || 0))],
+    ];
+    for (const [label, value] of metaItems) {
+      const div = document.createElement('div');
+      div.className = 'meta-item';
+      div.textContent = `${label}：${value}`;
+      elements.serenityMeta.appendChild(div);
+    }
+    elements.serenityOutput.className = 'serenity-output';
+    elements.serenityOutput.innerHTML = `<pre>${escapeHtml(payload.analysis || '(無分析內容)')}</pre>`;
+    setSerenityStatus('分析完成', 'success');
+  } catch (error) {
+    elements.serenityOutput.className = 'serenity-output serenity-error';
+    elements.serenityOutput.innerHTML = `<pre>${escapeHtml(String(error.message || error))}</pre>`;
+    setSerenityStatus('分析失敗', 'failed');
+  } finally {
+    if (state.serenityProgressTimer) {
+      clearInterval(state.serenityProgressTimer);
+      state.serenityProgressTimer = null;
+    }
+    renderActionButtons();
+  }
+}
+
 async function selectFunction(key) {
   state.selectedKey = key;
   localStorage.setItem('stock-control-selected', key);
   state.selectedFunction = state.functions.find((item) => item.key === key) || null;
+  resetSerenityPanel();
   renderGroups();
 
   if (!state.selectedFunction) return;
@@ -1894,6 +2072,7 @@ async function init() {
   checkUpdateStatus();
 
   elements.refreshButton.addEventListener('click', refreshCurrentView);
+  elements.serenityButton.addEventListener('click', runSerenityAnalysis);
   elements.institutionalButton.addEventListener('click', runInstitutional);
   elements.intradayButton.addEventListener('click', runIntraday);
   elements.refreshFutureButton.addEventListener('click', refreshFuture);
@@ -1930,6 +2109,7 @@ async function init() {
     }
     state.selectedDate = nextDate;
     localStorage.setItem('stock-control-date', state.selectedDate);
+    resetSerenityPanel();
     await loadCurrentResult();
   });
 

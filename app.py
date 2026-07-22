@@ -42,8 +42,10 @@ LOCAL_PRESERVE_NAMES = {".env", "stock_control_panel.db", ".git", ".venv", "Rele
 UPDATE_TRACKED_PATHS = [
     "app.py",
     "requirements.txt",
-    "start_stock_control_panel.bat",
-    "launch_stock_control_panel.py",
+    "README.md",
+    "RELEASING.md",
+    "build_portable_exe.py",
+    "stock_control_panel_boot.py",
     "templates/index.html",
     "static/app.js",
     "static/style.css",
@@ -102,6 +104,9 @@ INTRADAY_FUNCTION_KEYS = {
     "limit_up_red_arrow",
 }
 FEAR_GREED_FUNCTION_KEY = "cnn_fear_greed_index"
+CNN_FEAR_GREED_URL = "https://www.cnn.com/markets/fear-and-greed"
+CNN_FEAR_GREED_API_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+TW_MM_FEAR_GREED_URL = "https://www.macromicro.me/charts/50108/tw-market-fear-and-greed"
 FINMIND_API_URL = "https://api.finmindtrade.com/api/v4/data"
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 INTRADAY_QUOTE_CACHE_TTL_SECONDS = 20
@@ -138,9 +143,9 @@ class FunctionSpec:
 FUNCTIONS: list[FunctionSpec] = [
     FunctionSpec(
         key=FEAR_GREED_FUNCTION_KEY,
-        name="美國 CNN 恐懼與貪婪指數",
+        name="美國 / 台灣 恐懼與貪婪指數",
         category="市場情緒",
-        description="查看美股市場目前偏向恐懼或貪婪。",
+        description="同頁查看美國 CNN 與台灣 MM 的恐懼與貪婪指數。",
         executable=False,
     ),
     FunctionSpec(
@@ -181,6 +186,9 @@ FUNCTIONS: list[FunctionSpec] = [
 ]
 FUNCTION_MAP = {item.key: item for item in FUNCTIONS}
 CACHEABLE_FUNCTION_KEYS = {item.key for item in FUNCTIONS if item.executable}
+SERENITY_FUNCTION_KEYS = CACHEABLE_FUNCTION_KEYS
+SERENITY_MAX_STOCKS = 30
+SERENITY_TIMEOUT_SECONDS = 900
 
 
 def resolve_pre_breakout_script() -> Path:
@@ -1219,14 +1227,74 @@ def _build_fear_greed_recommendation(score: float) -> dict[str, Any]:
     return {"action": "hold", "label": "25~75 中性區", "message": "目前介於 25 到 75 之間，先觀察，不急著追買或殺低。"}
 
 
+def _build_fear_greed_market_payload(
+    *,
+    market_key: str,
+    market_label: str,
+    source: str,
+    score: float,
+    rating: str,
+    status_text: str,
+    updated_at: str,
+    history: list[dict[str, Any]],
+    one_year_history: list[dict[str, Any]],
+    recommendation: dict[str, Any] | None = None,
+    available: bool = True,
+    error_message: str = "",
+    source_url: str = "",
+) -> dict[str, Any]:
+    current_score = round(float(score), 2)
+    return {
+        "market_key": market_key,
+        "market_label": market_label,
+        "source": source,
+        "available": available,
+        "score": current_score,
+        "rating": rating,
+        "status_text": status_text,
+        "updated_at": updated_at,
+        "history": history,
+        "one_year_history": one_year_history,
+        "recommendation": recommendation or _build_fear_greed_recommendation(current_score),
+        "thresholds": {"buy": 25, "neutral": 50, "sell": 75},
+        "error_message": error_message,
+        "source_url": source_url,
+    }
+
+
+def _build_unavailable_fear_greed_market_payload(
+    *,
+    market_key: str,
+    market_label: str,
+    source: str,
+    error_message: str,
+    source_url: str = "",
+) -> dict[str, Any]:
+    return _build_fear_greed_market_payload(
+        market_key=market_key,
+        market_label=market_label,
+        source=source,
+        score=0,
+        rating="",
+        status_text="目前暫時抓不到資料",
+        updated_at="",
+        history=[],
+        one_year_history=[],
+        recommendation={"action": "hold", "label": "暫無資料", "message": error_message},
+        available=False,
+        error_message=error_message,
+        source_url=source_url,
+    )
+
+
 def _fetch_cnn_fear_greed_api_payload() -> dict[str, Any]:
     request = urllib.request.Request(
-        "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+        CNN_FEAR_GREED_API_URL,
         headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.cnn.com/markets/fear-and-greed",
+            "Referer": CNN_FEAR_GREED_URL,
             "Origin": "https://www.cnn.com",
         },
     )
@@ -1253,40 +1321,27 @@ def _fetch_cnn_fear_greed_api_payload() -> dict[str, Any]:
         )
 
     current_score = round(float(current.get("score") or 0), 2)
-    recommendation = _build_fear_greed_recommendation(current_score)
-    return {
-        "source": "CNN Fear & Greed Index",
-        "score": current_score,
-        "rating": _title_case_rating(current.get("rating", "")),
-        "status_text": f"{_title_case_rating(current.get('rating', ''))} is driving the US market",
-        "updated_at": _format_cnn_timestamp(str(current.get("timestamp") or "")),
-        "history": [
+    return _build_fear_greed_market_payload(
+        market_key="us_cnn",
+        market_label="美國 CNN 恐懼與貪婪指數",
+        source="CNN Fear & Greed Index",
+        score=current_score,
+        rating=_title_case_rating(current.get("rating", "")),
+        status_text=f"{_title_case_rating(current.get('rating', ''))} is driving the US market",
+        updated_at=_format_cnn_timestamp(str(current.get("timestamp") or "")),
+        history=[
             {"label": "前一收盤", "score": round(float(current.get("previous_close") or 0), 2)},
             {"label": "1 週前", "score": round(float(current.get("previous_1_week") or 0), 2)},
             {"label": "1 個月前", "score": round(float(current.get("previous_1_month") or 0), 2)},
             {"label": "1 年前", "score": round(float(current.get("previous_1_year") or 0), 2)},
         ],
-        "one_year_history": history_points,
-        "recommendation": recommendation,
-        "thresholds": {"buy": 25, "neutral": 50, "sell": 75},
-        "indicators": [],
-        "fetched_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "from_cache": False,
-    }
+        one_year_history=history_points,
+    )
 
 
-def fetch_cnn_fear_greed_payload(force_refresh: bool = False) -> dict[str, Any]:
-    now_ts = time.time()
-    with fear_greed_cache_lock:
-        cached_payload = fear_greed_cache_state.get("payload")
-        fetched_at = float(fear_greed_cache_state.get("fetched_at") or 0.0)
-        if not force_refresh and cached_payload and now_ts - fetched_at < FEAR_GREED_CACHE_TTL_SECONDS:
-            response = dict(cached_payload)
-            response["from_cache"] = True
-            return response
-
+def fetch_cnn_fear_greed_payload() -> dict[str, Any]:
     try:
-        payload = _fetch_cnn_fear_greed_api_payload()
+        return _fetch_cnn_fear_greed_api_payload()
     except Exception:
         browser_path = _find_headless_browser_path()
         command = [
@@ -1295,7 +1350,7 @@ def fetch_cnn_fear_greed_payload(force_refresh: bool = False) -> dict[str, Any]:
             "--disable-gpu",
             "--virtual-time-budget=15000",
             "--dump-dom",
-            "https://www.cnn.com/markets/fear-and-greed",
+            CNN_FEAR_GREED_URL,
         ]
         completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=90)
         if completed.returncode != 0 and not completed.stdout.strip():
@@ -1309,13 +1364,15 @@ def fetch_cnn_fear_greed_payload(force_refresh: bool = False) -> dict[str, Any]:
             raise RuntimeError("目前無法從 CNN 頁面解析恐懼與貪婪指數。")
 
         fallback_score = int(score_match.group(1))
-        payload = {
-            "source": "CNN Fear & Greed Index",
-            "score": fallback_score,
-            "rating": _title_case_rating(rating_match.group(1)),
-            "status_text": f"{_title_case_rating(rating_match.group(1))} is driving the US market",
-            "updated_at": _normalize_space(timestamp_match.group(1)) if timestamp_match else "",
-            "history": [
+        return _build_fear_greed_market_payload(
+            market_key="us_cnn",
+            market_label="美國 CNN 恐懼與貪婪指數",
+            source="CNN Fear & Greed Index",
+            score=fallback_score,
+            rating=_title_case_rating(rating_match.group(1)),
+            status_text=f"{_title_case_rating(rating_match.group(1))} is driving the US market",
+            updated_at=_normalize_space(timestamp_match.group(1)) if timestamp_match else "",
+            history=[
                 item
                 for item in [
                     _extract_fear_greed_history(html, "prevClose", "前一收盤"),
@@ -1325,16 +1382,79 @@ def fetch_cnn_fear_greed_payload(force_refresh: bool = False) -> dict[str, Any]:
                 ]
                 if item is not None
             ],
-            "one_year_history": [],
-            "recommendation": _build_fear_greed_recommendation(fallback_score),
-            "thresholds": {"buy": 25, "neutral": 50, "sell": 75},
-            "indicators": _extract_fear_greed_indicators(html),
-            "fetched_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "from_cache": False,
-        }
+            one_year_history=[],
+            recommendation=_build_fear_greed_recommendation(fallback_score),
+        )
+
+
+def fetch_tw_mm_fear_greed_payload() -> dict[str, Any]:
+    browser_path = _find_headless_browser_path()
+    command = [
+        browser_path,
+        "--headless",
+        "--disable-gpu",
+        "--virtual-time-budget=15000",
+        "--dump-dom",
+        TW_MM_FEAR_GREED_URL,
+    ]
+    completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=90)
+    html = completed.stdout or completed.stderr or ""
+    if completed.returncode != 0 and not html.strip():
+        raise RuntimeError("MM 頁面抓取失敗。")
+
+    if "Performing security verification" in html or "正在執行安全驗證" in html or "驗證您是人類" in html:
+        raise RuntimeError("MM 網站目前有 Cloudflare 驗證，暫時無法自動抓取。")
+
+    score_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*</[^>]+>\s*<[^>]+[^>]*>\s*(Extreme Fear|Fear|Neutral|Greed|Extreme Greed)', html, re.I)
+    if not score_match:
+        raise RuntimeError("目前無法從 MM 頁面解析出台灣恐懼與貪婪指數。")
+
+    score = round(float(score_match.group(1)), 2)
+    rating = _title_case_rating(score_match.group(2))
+    return _build_fear_greed_market_payload(
+        market_key="tw_mm",
+        market_label="台灣-MM 恐懼與貪婪指數",
+        source="MacroMicro 台灣市場恐懼與貪婪指數",
+        score=score,
+        rating=rating,
+        status_text=f"{rating} is driving the Taiwan market",
+        updated_at="",
+        history=[],
+        one_year_history=[],
+    )
+
+
+def fetch_fear_greed_payload(force_refresh: bool = False) -> dict[str, Any]:
+    now_ts = time.time()
+    with fear_greed_cache_lock:
+        cached_payload = fear_greed_cache_state.get("payload")
+        fetched_at = float(fear_greed_cache_state.get("fetched_at") or 0.0)
+        if not force_refresh and cached_payload and now_ts - fetched_at < FEAR_GREED_CACHE_TTL_SECONDS:
+            response = deepcopy(cached_payload)
+            response["from_cache"] = True
+            return response
+
+    us_payload = fetch_cnn_fear_greed_payload()
+    try:
+        tw_payload = fetch_tw_mm_fear_greed_payload()
+    except Exception as exc:
+        tw_payload = _build_unavailable_fear_greed_market_payload(
+            market_key="tw_mm",
+            market_label="台灣-MM 恐懼與貪婪指數",
+            source="MacroMicro 台灣市場恐懼與貪婪指數",
+            error_message="此區不顯示內容，請直接點下方連結查看 MM 原頁。",
+            source_url="https://www.macromicro.me/charts/128747/taiwan-mm-fear-and-greed-index-vs-taiex",
+        )
+
+    payload = {
+        "source": "Fear & Greed",
+        "markets": [us_payload, tw_payload],
+        "fetched_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "from_cache": False,
+    }
 
     with fear_greed_cache_lock:
-        fear_greed_cache_state["payload"] = dict(payload)
+        fear_greed_cache_state["payload"] = deepcopy(payload)
         fear_greed_cache_state["fetched_at"] = now_ts
     return payload
 
@@ -1418,6 +1538,126 @@ def run_command(command: list[str], timeout: int = 300) -> subprocess.CompletedP
         timeout=timeout,
         env=env,
     )
+
+
+def normalize_serenity_stocks(raw_stocks: Any) -> list[dict[str, str]]:
+    if not isinstance(raw_stocks, list):
+        return []
+
+    stocks: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in raw_stocks:
+        if not isinstance(raw, dict):
+            continue
+        code = str(raw.get("code") or "").strip()
+        if not re.fullmatch(r"\d{4,6}", code) or code in seen:
+            continue
+        seen.add(code)
+        stocks.append(
+            {
+                "code": code,
+                "name": str(raw.get("name") or "").strip()[:40],
+                "theme": str(raw.get("theme") or raw.get("theme_name") or "").strip()[:60],
+                "grade": str(raw.get("grade") or "").strip()[:8],
+                "rank_score": str(raw.get("rank_score") or "").strip()[:20],
+                "close": str(raw.get("close") or "").strip()[:20],
+                "volume": str(raw.get("volume") or "").strip()[:20],
+            }
+        )
+        if len(stocks) >= SERENITY_MAX_STOCKS:
+            break
+    return stocks
+
+
+def build_serenity_prompt(function_name: str, result_date: str, stocks: list[dict[str, str]]) -> str:
+    date_label = result_date
+    if re.fullmatch(r"\d{8}", result_date):
+        date_label = f"{result_date[:4]}-{result_date[4:6]}-{result_date[6:]}"
+
+    rows: list[str] = []
+    for stock in stocks:
+        details = []
+        if stock.get("theme"):
+            details.append(f"族群={stock['theme']}")
+        if stock.get("grade"):
+            details.append(f"等級={stock['grade']}")
+        if stock.get("rank_score"):
+            details.append(f"排序分數={stock['rank_score']}")
+        if stock.get("close"):
+            details.append(f"收盤={stock['close']}")
+        if stock.get("volume"):
+            details.append(f"成交量={stock['volume']}")
+        suffix = f"｜{'、'.join(details)}" if details else ""
+        rows.append(f"- {stock['code']} {stock.get('name') or ''}{suffix}".rstrip())
+
+    stock_text = "\n".join(rows)
+    return f"""請使用 Serenity Skill，針對 StockControlPanel 的選股結果做台股供應鏈深度分析。
+
+選股功能：{function_name}
+交易日期：{date_label}
+候選清單：
+{stock_text}
+
+請使用目前可查到的公開資料，先辨識候選股所屬族群與產業鏈，再找真正難擴產、供應商少、驗證期長或掌握關鍵技術的瓶頸環節。
+
+你已獲得 browser 瀏覽器工具。必須先實際呼叫 browser_navigate / browser_snapshot 查證最新資料，不可因 web_search 不可用就直接停止分析。可以用 Bing 搜尋公司代號、公司名稱、月營收、法說會、產能與訂單，再開啟搜尋結果。若個別官網被 Cloudflare 阻擋，請改查公開資訊觀測站、交易所、Yahoo 股市、鉅亨、MoneyDJ 或其他可讀的公開來源，並明確標示來源品質。候選超過 10 檔時，先挑最有瓶頸潛力的 10 檔深入核對，其餘做初步分類。
+
+請用繁體中文，依序輸出：
+1. 先講結論與最值得優先研究的產業鏈層級。
+2. 候選股研究優先順序，逐檔說明產業鏈位置、瓶頸關聯、具體證據、證據強度與主要風險。
+3. 指出哪些股票可能只是題材沾邊。
+4. 列出會讓判斷失效的反方條件。
+5. 給出下一步應查證的公告、月營收、產能、客戶或訂單指標。
+
+這是研究輔助，不要給出保證獲利、直接買進或直接賣出的指令；資料不足時請明確標示尚待查證。"""
+
+
+def run_serenity_cli(prompt: str) -> str:
+    hermes_bin = shutil.which("hermes")
+    if not hermes_bin:
+        raise RuntimeError("找不到 Hermes CLI。請先安裝並登入 Hermes Agent，再使用 Serenity 深度分析。")
+
+    command = [
+        hermes_bin,
+        "chat",
+        "-Q",
+        "--source",
+        "tool",
+        "--max-turns",
+        "35",
+        "-t",
+        "browser,web",
+        "-s",
+        "serenity-skill",
+        "-q",
+        prompt,
+    ]
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=MILES_AGENT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=SERENITY_TIMEOUT_SECONDS,
+            env=env,
+            creationflags=creationflags,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Serenity 深度分析超過 15 分鐘，請縮小候選清單後再試。") from exc
+
+    output = (completed.stdout or "").strip()
+    if completed.returncode != 0:
+        detail = (completed.stderr or output or "Hermes CLI 執行失敗").strip()
+        raise RuntimeError(detail[-2000:])
+    if not output:
+        raise RuntimeError("Serenity 沒有回傳分析內容。")
+    return output
 
 
 def build_local_update_signature() -> str:
@@ -2010,9 +2250,47 @@ def api_update_status() -> Any:
 def api_fear_greed() -> Any:
     force_refresh = request.args.get("force_refresh") == "1"
     try:
-        return jsonify(fetch_cnn_fear_greed_payload(force_refresh=force_refresh))
+        return jsonify(fetch_fear_greed_payload(force_refresh=force_refresh))
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/serenity/<function_key>", methods=["POST"])
+def api_serenity(function_key: str) -> Any:
+    spec = FUNCTION_MAP.get(function_key)
+    if spec is None:
+        return jsonify({"ok": False, "error": "找不到指定功能。"}), 404
+    if function_key not in SERENITY_FUNCTION_KEYS:
+        return jsonify({"ok": False, "error": "這個頁面不是選股功能，無法執行 Serenity 分析。"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    stocks = normalize_serenity_stocks(payload.get("stocks"))
+    if not stocks:
+        return jsonify({"ok": False, "error": "目前結果沒有可供 Serenity 分析的股票清單。"}), 400
+
+    result_date = str(payload.get("result_date") or "").strip()
+    if result_date and not re.fullmatch(r"\d{8}", result_date):
+        return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
+
+    prompt = build_serenity_prompt(spec.name, result_date, stocks)
+    started = time.perf_counter()
+    try:
+        analysis = run_serenity_cli(prompt)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "function_key": spec.key,
+            "function_name": spec.name,
+            "result_date": result_date,
+            "stock_count": len(stocks),
+            "analysis": analysis,
+            "duration_seconds": round(time.perf_counter() - started, 3),
+            "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+    )
 
 
 @app.route("/api/result")
