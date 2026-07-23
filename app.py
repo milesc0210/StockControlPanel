@@ -288,7 +288,7 @@ def trading_dates_for_year(year: int) -> list[str]:
         name = str(row[1]).strip()
         note = str(row[2]).strip() if len(row) > 2 else ""
         combined = f"{name} {note}"
-        if any(keyword in combined for keyword in ["無交易", "放假", "停止交易"]):
+        if any(keyword in combined for keyword in ["無交易", "放假", "補假", "停止交易"]):
             non_trading.add(date_text)
 
     current = datetime(year, 1, 1)
@@ -319,6 +319,24 @@ def expected_latest_market_date(now: datetime | None = None) -> str | None:
     return None
 
 
+def missing_market_dates_through(expected_date: str) -> list[str]:
+    shared_dates = valid_shared_dates()
+    if not shared_dates:
+        return [expected_date]
+
+    first_local_date = shared_dates[0]
+    available = set(shared_dates)
+    unavailable = known_unavailable_market_dates()
+    trading_dates = trading_dates_for_year(int(expected_date[:4]))
+    return [
+        date
+        for date in trading_dates
+        if first_local_date <= date <= expected_date
+        and date not in available
+        and date not in unavailable
+    ]
+
+
 
 def current_data_sync_status() -> dict[str, Any]:
     return dict(market_data_sync_state)
@@ -329,6 +347,7 @@ def ensure_latest_market_data() -> dict[str, Any]:
     now = taipei_now()
     try:
         expected_date = expected_latest_market_date(now)
+        missing_dates = missing_market_dates_through(expected_date) if expected_date else []
     except Exception as exc:
         status = {
             "status": "error",
@@ -351,54 +370,86 @@ def ensure_latest_market_data() -> dict[str, Any]:
         market_data_sync_state.update(status)
         return status
 
-    latest_local = valid_shared_dates()[-1] if valid_shared_dates() else None
-    if latest_local and latest_local >= expected_date:
+    if not missing_dates:
+        latest_local = valid_shared_dates()[-1] if valid_shared_dates() else None
         status = {
             "status": "up_to_date",
-            "message": f"最新資料已存在（{latest_local}）",
+            "message": f"交易日資料已完整（最新 {latest_local}）",
             "checked_for": expected_date,
             "last_run": now.isoformat(timespec="seconds"),
             "fetched": False,
+            "missing_dates": [],
         }
         market_data_sync_state.update(status)
         return status
 
     with market_data_sync_lock:
-        latest_local = valid_shared_dates()[-1] if valid_shared_dates() else None
-        if latest_local and latest_local >= expected_date:
+        missing_dates = missing_market_dates_through(expected_date)
+        if not missing_dates:
+            latest_local = valid_shared_dates()[-1] if valid_shared_dates() else None
             status = {
                 "status": "up_to_date",
-                "message": f"最新資料已存在（{latest_local}）",
+                "message": f"交易日資料已完整（最新 {latest_local}）",
                 "checked_for": expected_date,
                 "last_run": now.isoformat(timespec="seconds"),
                 "fetched": False,
+                "missing_dates": [],
             }
             market_data_sync_state.update(status)
             return status
 
-        command = build_script_command(SCRIPTS_DIR / "twse_tpex_fetch.py", expected_date)
-        result = subprocess.run(
-            command,
-            cwd=MILES_AGENT_ROOT,
-            capture_output=True,
-            text=True,
-            env=os.environ.copy(),
-        )
-        latest_after = valid_shared_dates()[-1] if valid_shared_dates() else None
-        fetched_ok = result.returncode == 0 and latest_after and latest_after >= expected_date
-        output = (result.stdout or result.stderr or "").strip()
+        fetched_dates: list[str] = []
+        skipped_dates: list[str] = []
+        failed_dates: list[str] = []
+        commands: list[list[str]] = []
+        failure_messages: list[str] = []
+        for missing_date in missing_dates:
+            command = build_script_command(SCRIPTS_DIR / "twse_tpex_fetch.py", missing_date)
+            commands.append(command)
+            result = subprocess.run(
+                command,
+                cwd=MILES_AGENT_ROOT,
+                capture_output=True,
+                text=True,
+                env=os.environ.copy(),
+            )
+            output = (result.stdout or result.stderr or "").strip()
+            date_is_valid = missing_date in set(valid_shared_dates())
+            if result.returncode == 0 and date_is_valid:
+                fetched_dates.append(missing_date)
+                continue
+            is_confirmed_historical_closure = (
+                missing_date < expected_date
+                and "TWSE:找不到 16 欄的股票資料表" in output
+                and "TPEX:資料為空" in output
+            )
+            if is_confirmed_historical_closure:
+                remember_unavailable_market_date(missing_date, output)
+                skipped_dates.append(missing_date)
+                continue
+            failed_dates.append(missing_date)
+            failure_messages.append(f"{missing_date}: {output[:160]}")
+
+        all_ok = not failed_dates
+        status_name = "fetched" if fetched_dates and all_ok else "up_to_date" if all_ok else "failed"
+        if failed_dates:
+            message = f"部分交易日補抓失敗：{'；'.join(failure_messages)}"
+        elif fetched_dates:
+            message = f"已自動補齊 {len(fetched_dates)} 個交易日：{', '.join(fetched_dates)}"
+        else:
+            message = f"已確認休市日期：{', '.join(skipped_dates)}"
         status = {
-            "status": "fetched" if fetched_ok else "failed",
-            "message": (
-                f"已自動補抓最新資料（{expected_date}）"
-                if fetched_ok
-                else f"自動補抓 {expected_date} 失敗：{output[:240]}"
-            ),
+            "status": status_name,
+            "message": message,
             "checked_for": expected_date,
             "last_run": now.isoformat(timespec="seconds"),
-            "fetched": bool(fetched_ok),
-            "command": command,
-            "returncode": result.returncode,
+            "fetched": bool(fetched_dates) and all_ok,
+            "fetched_dates": fetched_dates,
+            "skipped_dates": skipped_dates,
+            "failed_dates": failed_dates,
+            "missing_dates": missing_dates,
+            "commands": commands,
+            "returncode": 0 if all_ok else 1,
         }
         market_data_sync_state.update(status)
         return status
@@ -715,6 +766,29 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+def known_unavailable_market_dates() -> set[str]:
+    try:
+        with get_db() as conn:
+            rows = conn.execute("SELECT result_date FROM unavailable_market_dates").fetchall()
+    except sqlite3.OperationalError:
+        return set()
+    return {str(row["result_date"]) for row in rows}
+
+
+def remember_unavailable_market_date(result_date: str, reason: str) -> None:
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO unavailable_market_dates (result_date, reason, checked_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(result_date) DO UPDATE SET
+                reason = excluded.reason,
+                checked_at = excluded.checked_at
+            """,
+            (result_date, reason, taipei_now().isoformat(timespec="seconds")),
+        )
+
+
 def init_db() -> None:
     with get_db() as conn:
         conn.execute(
@@ -782,6 +856,15 @@ def init_db() -> None:
                 payload_json TEXT NOT NULL,
                 cached_at TEXT NOT NULL,
                 PRIMARY KEY (function_key, result_date)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS unavailable_market_dates (
+                result_date TEXT PRIMARY KEY,
+                reason TEXT NOT NULL,
+                checked_at TEXT NOT NULL
             )
             """
         )
