@@ -52,6 +52,7 @@ UPDATE_TRACKED_PATHS = [
     "scripts/fetch_klines.py",
     "scripts/analyze_today_limitup_sector_groups.py",
     "scripts/screen_today_limitup.py",
+    "scripts/screen_low_base_turnaround.py",
     "scripts/pre_breakout_screen.py",
     "scripts/pre_breakout_backtest.py",
     "scripts/twse_tpex_fetch.py",
@@ -98,6 +99,7 @@ OUTPUT_WATCH_DIRS = [
 PRE_BREAKOUT_FUNCTION_KEYS = {"pre_breakout_standard", "pre_breakout_conservative"}
 BACKTESTABLE_FUNCTION_KEYS = PRE_BREAKOUT_FUNCTION_KEYS
 INTRADAY_FUNCTION_KEYS = {
+    "low_base_turnaround",
     "pre_breakout_standard",
     "pre_breakout_conservative",
     "ma_bullish_turning_point",
@@ -167,6 +169,13 @@ FUNCTIONS: list[FunctionSpec] = [
         name="均線多頭新成形",
         category="訊號型功能",
         description="均線多頭剛成形。",
+        executable=True,
+    ),
+    FunctionSpec(
+        key="low_base_turnaround",
+        name="低基期選股",
+        category="主流程執行",
+        description="依目前市場環境找相對低基期、且近期開始轉強的股票；不使用一年低點。",
         executable=True,
     ),
     FunctionSpec(
@@ -751,6 +760,8 @@ def build_commands(spec: FunctionSpec, target_date: str | None = None) -> list[l
             build_script_command(scripts_dir / "screen_ma_alignment_turning_point.py", "--latest-date", latest_date, "--no-save"),
             build_script_command(scripts_dir / "analyze_012_sector_groups.py", "--latest-date", latest_date, "--no-save"),
         ]
+    if spec.key == "low_base_turnaround":
+        return [build_script_command(scripts_dir / "screen_low_base_turnaround.py", "--date", latest_date, "--no-save")]
     if spec.key == "pre_breakout_standard":
         pre_breakout_script = resolve_pre_breakout_script()
         return [build_script_command(pre_breakout_script, "--date", latest_date, "--relaxed")]

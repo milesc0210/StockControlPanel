@@ -180,6 +180,7 @@ function isFearGreedFunction(functionKey = state.selectedKey) {
 
 function isIntradayFunction(functionKey = state.selectedKey) {
   return [
+    'low_base_turnaround',
     'pre_breakout_conservative',
     'pre_breakout_standard',
     'ma_bullish_turning_point',
@@ -202,8 +203,13 @@ function getIntradayMap() {
 function getCurrentSerenityStocks() {
   if (!state.currentRun || state.currentRun.status !== 'success') return [];
   const text = state.currentRun.output_text || '';
-  let parsed = parsePreBreakoutOutput(text);
+  let parsed = parseLowBaseOutput(text);
   let stocks = parsed?.stocks || [];
+
+  if (!stocks.length) {
+    parsed = parsePreBreakoutOutput(text);
+    stocks = parsed?.stocks || [];
+  }
 
   if (!stocks.length) {
     parsed = parseLimitUpOutput(text);
@@ -217,7 +223,7 @@ function getCurrentSerenityStocks() {
   return stocks.slice(0, 30).map((stock) => ({
     code: stock.code || '',
     name: stock.name || '',
-    theme: stock.themeName || '',
+    theme: stock.themeName || stock.theme || '',
     grade: stock.grade || '',
     rank_score: stock.rankScore || '',
     close: stock.close || '',
@@ -863,6 +869,48 @@ function parseLimitUpOutput(text) {
   return { type: 'limit_up', summary, stocks, sector: parseSectorQuickOutput(text) };
 }
 
+function parseLowBaseOutput(text) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (!lines.some((line) => line.includes('LOW-BASE-TURNAROUND'))) return null;
+
+  const summary = {};
+  const stocks = [];
+  for (const line of lines) {
+    if (line.startsWith('交易日：')) summary.date = line.replace('交易日：', '').trim();
+    if (line.startsWith('市場60日中位數：')) summary.marketMedian = line.replace('市場60日中位數：', '').trim();
+    if (line.startsWith('評估母體：')) summary.universe = line.replace('評估母體：', '').trim();
+    if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
+
+    const match = line.match(/^([AB])\s+(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+族群=(\S+)\s+C=([\d.]+)\s+V=(\d+)張\s+60日=([+-]?[\d.]+)%\s+市場百分位=([\d.]+)\s+族群差=([+-]?[\d.]+)%\s+5日轉強=([+-]?[\d.]+)%\s+量比=([\d.]+)\s+分數=([\d.]+)\s+\|\s+後5日=(.+)$/);
+    if (!match) continue;
+    const futureRaw = match[14].trim();
+    const futureDays = futureRaw === '(無後續資料)'
+      ? []
+      : futureRaw.split(/\s*,\s*/).map((chunk) => {
+          const parts = chunk.match(/^(\d{8}):([\d.]+)\/([+-]?[\d.]+%)\/([+-]?[\d.]+%)$/);
+          if (!parts) return null;
+          return { date: parts[1], close: parts[2], pctFromSignal: parts[3], pctFromPrev: parts[4] };
+        }).filter(Boolean);
+    stocks.push({
+      grade: match[1],
+      market: match[2],
+      code: match[3],
+      name: match[4],
+      theme: match[5],
+      close: match[6],
+      volume: match[7],
+      return60d: match[8],
+      marketPercentile: match[9],
+      sectorRelative: match[10],
+      rebound5d: match[11],
+      volumeRatio: match[12],
+      rankScore: match[13],
+      futureDays,
+    });
+  }
+  return { type: 'low_base', summary, stocks };
+}
+
 function parsePreBreakoutOutput(text) {
   const lines = text.split('\n').map((line) => line.trimEnd());
   if (!lines.some((line) => line.includes('PRE-BREAKOUT'))) return null;
@@ -1440,6 +1488,75 @@ function renderLimitUp(parsed) {
   hydrateInlineKlines(stocks);
 }
 
+function renderLowBase(parsed) {
+  const stocks = parsed.stocks;
+  if (!stocks.length) {
+    elements.latestOutput.className = 'output-box rich-output';
+    elements.latestOutput.innerHTML = `
+      <div class="summary-grid">${buildSummaryChips({
+        '交易日': parsed.summary.date,
+        '市場60日中位數': parsed.summary.marketMedian,
+        '評估母體': parsed.summary.universe,
+        '入選數量': parsed.summary.count,
+      })}</div>
+      <div class="empty-block">目前沒有同時符合「市場相對低基期＋近期轉強」的股票。</div>`;
+    return;
+  }
+
+  const intradayMap = getIntradayMap();
+  const showIntradayColumns = isIntradayFunction();
+  const maxFutureDays = Math.max(...stocks.map((stock) => stock.futureDays.length));
+  let html = `<div class="summary-grid">${buildSummaryChips({
+    '交易日': parsed.summary.date,
+    '市場60日中位數': parsed.summary.marketMedian,
+    '評估母體': parsed.summary.universe,
+    '入選數量': parsed.summary.count,
+    '判斷方式': '市場相對排名，不看一年低點',
+  })}</div>`;
+  html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  html += '<th>等級</th><th style="text-align:right">分數</th><th>代號</th><th>名稱</th><th>族群</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">60日漲幅</th><th style="text-align:right">市場百分位</th><th style="text-align:right">族群差</th><th style="text-align:right">5日轉強</th><th style="text-align:right">量比</th>';
+  if (showIntradayColumns) html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
+  if (maxFutureDays > 0) {
+    for (const day of stocks.find((stock) => stock.futureDays.length === maxFutureDays).futureDays) {
+      html += `<th style="text-align:center">${escapeHtml(formatYmd(day.date).slice(5))}</th>`;
+    }
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const stock of stocks) {
+    const intraday = intradayMap[stock.code] || {};
+    html += '<tr>';
+    html += `<td><span class="grade-pill ${gradeTone(stock.grade)}">${escapeHtml(stock.grade)}</span></td>`;
+    html += `<td class="td-number td-score">${escapeHtml(stock.rankScore)}</td>`;
+    html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
+    html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
+    html += `<td><span class="theme-pill">${escapeHtml(stock.theme)}</span></td>`;
+    html += buildInlineKlineSlot(stock);
+    html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
+    html += `<td class="td-number">${escapeHtml(stock.volume)}</td>`;
+    html += `<td class="td-number ${toneClassFromNumber(stock.return60d)}">${escapeHtml(stock.return60d)}%</td>`;
+    html += `<td class="td-number">${escapeHtml(stock.marketPercentile)}</td>`;
+    html += `<td class="td-number ${toneClassFromNumber(stock.sectorRelative)}">${escapeHtml(stock.sectorRelative)}%</td>`;
+    html += `<td class="td-number up-text">${escapeHtml(stock.rebound5d)}%</td>`;
+    html += `<td class="td-number up-text">${escapeHtml(stock.volumeRatio)}倍</td>`;
+    if (showIntradayColumns) {
+      const intradayTone = toneClassFromNumber(intraday.change_percent);
+      html += `<td class="td-future td-intraday ${intradayTone}">${intraday.error ? '—' : `<strong>${formatPrice(intraday.last_price)}</strong><span>${formatChangePercent(intraday.change_percent)}</span>`}</td>`;
+      html += `<td class="td-number">${intraday.error ? '—' : formatVolume(intraday.trade_volume)}</td>`;
+    }
+    for (const day of stock.futureDays) {
+      const tone = day.pctFromPrev.startsWith('+') ? 'up-text' : day.pctFromPrev.startsWith('-') ? 'down-text' : '';
+      html += `<td class="td-future"><strong>${escapeHtml(day.close)}</strong><span class="${tone}">${escapeHtml(day.pctFromPrev)}</span></td>`;
+    }
+    for (let index = stock.futureDays.length; index < maxFutureDays; index++) html += '<td class="td-future td-empty">—</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  elements.latestOutput.className = 'output-box rich-output';
+  elements.latestOutput.innerHTML = html;
+  hydrateInlineKlines(stocks);
+}
+
 function renderPreBreakout(parsed) {
   const stocks = parsed.stocks;
   const institutionalMap = getInstitutionalMap();
@@ -1651,6 +1768,12 @@ function renderMaBullish(parsed) {
 
 function renderOutput(run) {
   const text = run.output_text || '(無輸出)';
+  const parsedLowBase = parseLowBaseOutput(text);
+  if (parsedLowBase && run.status === 'success') {
+    renderLowBase(parsedLowBase);
+    return;
+  }
+
   const parsedLimitUp = parseLimitUpOutput(text);
   if (parsedLimitUp && run.status === 'success') {
     renderLimitUp(parsedLimitUp);
