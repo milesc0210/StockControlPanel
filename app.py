@@ -774,6 +774,17 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS serenity_cache (
+                function_key TEXT NOT NULL,
+                result_date TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                cached_at TEXT NOT NULL,
+                PRIMARY KEY (function_key, result_date)
+            )
+            """
+        )
 
 
 def snapshot_watch_dirs() -> dict[str, float]:
@@ -977,6 +988,47 @@ def clear_institutional_cache(function_key: str, result_date: str) -> None:
         conn.execute(
             "DELETE FROM institutional_cache WHERE function_key = ? AND result_date = ?",
             (function_key, result_date),
+        )
+
+
+def lookup_serenity_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT payload_json, cached_at
+            FROM serenity_cache
+            WHERE function_key = ? AND result_date = ?
+            """,
+            (function_key, result_date),
+        ).fetchone()
+    if row is None:
+        return None
+    payload = json.loads(row["payload_json"] or "{}")
+    payload["from_cache"] = True
+    payload["cached_at"] = row["cached_at"]
+    return payload
+
+
+def upsert_serenity_cache(function_key: str, result_date: str, payload: dict[str, Any]) -> None:
+    cached_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    stored_payload = dict(payload)
+    stored_payload["from_cache"] = False
+    stored_payload["cached_at"] = cached_at
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO serenity_cache (function_key, result_date, payload_json, cached_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(function_key, result_date) DO UPDATE SET
+                payload_json = excluded.payload_json,
+                cached_at = excluded.cached_at
+            """,
+            (
+                function_key,
+                result_date,
+                json.dumps(stored_payload, ensure_ascii=False),
+                cached_at,
+            ),
         )
 
 
@@ -2258,7 +2310,7 @@ def api_fear_greed() -> Any:
         return jsonify({"error": str(exc)}), 400
 
 
-@app.route("/api/serenity/<function_key>", methods=["POST"])
+@app.route("/api/serenity/<function_key>", methods=["GET", "POST"])
 def api_serenity(function_key: str) -> Any:
     spec = FUNCTION_MAP.get(function_key)
     if spec is None:
@@ -2266,14 +2318,29 @@ def api_serenity(function_key: str) -> Any:
     if function_key not in SERENITY_FUNCTION_KEYS:
         return jsonify({"ok": False, "error": "這個頁面不是選股功能，無法執行 Serenity 分析。"}), 400
 
+    if request.method == "GET":
+        result_date = str(request.args.get("result_date") or "").strip()
+        if not re.fullmatch(r"\d{8}", result_date):
+            return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
+        cached = lookup_serenity_cache(function_key, result_date)
+        if cached is None:
+            return jsonify({"ok": True, "cached": False}), 404
+        return jsonify(cached)
+
     payload = request.get_json(silent=True) or {}
+    result_date = str(payload.get("result_date") or "").strip()
+    if not re.fullmatch(r"\d{8}", result_date):
+        return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
+
+    force_refresh = payload.get("force_refresh") is True
+    if not force_refresh:
+        cached = lookup_serenity_cache(function_key, result_date)
+        if cached is not None:
+            return jsonify(cached)
+
     stocks = normalize_serenity_stocks(payload.get("stocks"))
     if not stocks:
         return jsonify({"ok": False, "error": "目前結果沒有可供 Serenity 分析的股票清單。"}), 400
-
-    result_date = str(payload.get("result_date") or "").strip()
-    if result_date and not re.fullmatch(r"\d{8}", result_date):
-        return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
 
     prompt = build_serenity_prompt(spec.name, result_date, stocks)
     started = time.perf_counter()
@@ -2282,18 +2349,19 @@ def api_serenity(function_key: str) -> Any:
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
-    return jsonify(
-        {
-            "ok": True,
-            "function_key": spec.key,
-            "function_name": spec.name,
-            "result_date": result_date,
-            "stock_count": len(stocks),
-            "analysis": analysis,
-            "duration_seconds": round(time.perf_counter() - started, 3),
-            "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        }
-    )
+    response_payload = {
+        "ok": True,
+        "function_key": spec.key,
+        "function_name": spec.name,
+        "result_date": result_date,
+        "stock_count": len(stocks),
+        "analysis": analysis,
+        "duration_seconds": round(time.perf_counter() - started, 3),
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "from_cache": False,
+    }
+    upsert_serenity_cache(function_key, result_date, response_payload)
+    return jsonify(response_payload)
 
 
 @app.route("/api/result")

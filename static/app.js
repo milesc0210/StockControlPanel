@@ -242,6 +242,61 @@ function resetSerenityPanel(message = '按上方「Serenity 深度分析」，�
   setSerenityStatus('待命', 'neutral');
 }
 
+function renderSerenityResult(payload) {
+  state.serenityResult = payload;
+  elements.serenityPanel.hidden = false;
+  elements.serenityMeta.innerHTML = '';
+  const metaItems = [
+    ['選股功能', payload.function_name],
+    ['交易日', formatYmd(payload.result_date)],
+    ['候選股', `${payload.stock_count} 檔`],
+    ['分析時間', compactTimestamp(payload.generated_at)],
+    ['耗時', formatDuration(Number(payload.duration_seconds || 0))],
+    ['資料來源', payload.from_cache ? 'DB 快取' : 'Hermes 即時分析'],
+  ];
+  if (payload.from_cache && payload.cached_at) {
+    metaItems.push(['快取時間', compactTimestamp(payload.cached_at)]);
+  }
+  for (const [label, value] of metaItems) {
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    div.textContent = `${label}：${value}`;
+    elements.serenityMeta.appendChild(div);
+  }
+  elements.serenityOutput.className = 'serenity-output';
+  elements.serenityOutput.innerHTML = `<pre>${escapeHtml(payload.analysis || '(無分析內容)')}</pre>`;
+  setSerenityStatus(payload.from_cache ? '已載入快取' : '分析完成', 'success');
+}
+
+async function loadSerenityCache() {
+  if (!state.selectedFunction?.executable || !state.selectedDate || isFearGreedFunction()) return false;
+  const functionKey = state.selectedKey;
+  const resultDate = state.selectedDate;
+  const query = new URLSearchParams({ result_date: resultDate });
+  try {
+    const response = await fetch(`/api/serenity/${encodeURIComponent(functionKey)}?${query.toString()}`);
+    const payload = await response.json();
+    if (functionKey !== state.selectedKey || resultDate !== state.selectedDate) return false;
+    if (response.status === 404 && payload.cached === false) {
+      resetSerenityPanel();
+      renderActionButtons();
+      return false;
+    }
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || '讀取 Serenity 快取失敗');
+    }
+    renderSerenityResult(payload);
+    renderActionButtons();
+    return true;
+  } catch (error) {
+    if (functionKey === state.selectedKey && resultDate === state.selectedDate) {
+      resetSerenityPanel(`讀取 Serenity 快取失敗：${String(error.message || error)}`);
+      setSerenityStatus('讀取失敗', 'failed');
+    }
+    return false;
+  }
+}
+
 function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
   const showSerenity = !isFearGreed && Boolean(state.selectedFunction?.executable);
@@ -1685,6 +1740,7 @@ async function loadCurrentResult() {
     throw new Error(payload.error || '讀取結果失敗');
   }
   renderLatest(payload);
+  await loadSerenityCache();
 }
 
 async function loadFearGreedStatus(forceRefresh = false) {
@@ -1789,7 +1845,8 @@ async function runBacktest() {
   }
 }
 
-async function runSerenityAnalysis() {
+async function runSerenityAnalysis(forceRefresh = false) {
+  forceRefresh = forceRefresh === true;
   if (!state.selectedFunction?.executable) return;
   const stocks = getCurrentSerenityStocks();
   if (!stocks.length) {
@@ -1824,6 +1881,7 @@ async function runSerenityAnalysis() {
       body: JSON.stringify({
         result_date: state.selectedDate,
         stocks,
+        force_refresh: forceRefresh,
       }),
     });
     const payload = await response.json();
@@ -1831,24 +1889,7 @@ async function runSerenityAnalysis() {
       throw new Error(payload.error || 'Serenity 深度分析失敗');
     }
 
-    state.serenityResult = payload;
-    elements.serenityMeta.innerHTML = '';
-    const metaItems = [
-      ['選股功能', payload.function_name],
-      ['交易日', formatYmd(payload.result_date)],
-      ['候選股', `${payload.stock_count} 檔`],
-      ['分析時間', compactTimestamp(payload.generated_at)],
-      ['耗時', formatDuration(Number(payload.duration_seconds || 0))],
-    ];
-    for (const [label, value] of metaItems) {
-      const div = document.createElement('div');
-      div.className = 'meta-item';
-      div.textContent = `${label}：${value}`;
-      elements.serenityMeta.appendChild(div);
-    }
-    elements.serenityOutput.className = 'serenity-output';
-    elements.serenityOutput.innerHTML = `<pre>${escapeHtml(payload.analysis || '(無分析內容)')}</pre>`;
-    setSerenityStatus('分析完成', 'success');
+    renderSerenityResult(payload);
   } catch (error) {
     elements.serenityOutput.className = 'serenity-output serenity-error';
     elements.serenityOutput.innerHTML = `<pre>${escapeHtml(String(error.message || error))}</pre>`;
@@ -1934,6 +1975,7 @@ async function refreshFuture() {
     renderPlainOutput('目前沒有可用交易日。', 'error-output');
     return;
   }
+  const shouldRefreshSerenity = Boolean(state.serenityResult);
 
   elements.refreshFutureButton.disabled = true;
   setStatus('強制重跑中...', 'running');
@@ -1951,6 +1993,9 @@ async function refreshFuture() {
       throw new Error(payload.error || '強制重跑失敗');
     }
     renderLatest(payload);
+    if (shouldRefreshSerenity) {
+      await runSerenityAnalysis(true);
+    }
   } catch (error) {
     setStatus('強制重跑失敗', 'failed');
     renderPlainOutput(String(error.message || error), 'error-output');

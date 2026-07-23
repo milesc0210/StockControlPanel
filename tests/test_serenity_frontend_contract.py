@@ -16,7 +16,7 @@ class SerenityFrontendContractTests(unittest.TestCase):
     def test_javascript_collects_candidates_and_calls_api(self):
         script = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         self.assertIn("function getCurrentSerenityStocks()", script)
-        self.assertIn("async function runSerenityAnalysis()", script)
+        self.assertIn("async function runSerenityAnalysis(forceRefresh = false)", script)
         self.assertIn("/api/serenity/", script)
         self.assertIn("elements.serenityButton.hidden", script)
         self.assertIn("elements.serenityButton.addEventListener('click', runSerenityAnalysis)", script)
@@ -25,6 +25,15 @@ class SerenityFrontendContractTests(unittest.TestCase):
         css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
         self.assertIn(".serenity-btn", css)
         self.assertIn(".serenity-output", css)
+
+    def test_javascript_restores_cache_and_force_reruns_serenity(self):
+        script = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("async function loadSerenityCache()", script)
+        self.assertIn("async function runSerenityAnalysis(forceRefresh = false)", script)
+        self.assertIn("force_refresh: forceRefresh", script)
+        self.assertIn("await loadSerenityCache();", script)
+        self.assertIn("await runSerenityAnalysis(true);", script)
+        self.assertIn("payload.from_cache ? 'DB 快取' : 'Hermes 即時分析'", script)
 
 
 if __name__ == "__main__":
