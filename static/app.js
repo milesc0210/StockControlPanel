@@ -65,6 +65,7 @@ const elements = {
   backtestEntryMax: document.getElementById('backtest-entry-max'),
   backtestEntryMin: document.getElementById('backtest-entry-min'),
   backtestTopN: document.getElementById('backtest-top-n'),
+  backtestTotalCapital: document.getElementById('backtest-total-capital'),
   backtestRunButton: document.getElementById('backtest-run-button'),
   backtestStatusPill: document.getElementById('backtest-status-pill'),
   backtestMeta: document.getElementById('backtest-meta'),
@@ -1176,6 +1177,7 @@ function renderBacktest(payload) {
       <div class="backtest-summary-card"><span>勝率</span><strong>${formatSignedPercent(summary.win_rate_pct).replace('+', '')}</strong></div>
       <div class="backtest-summary-card"><span>最大回撤</span><strong class="down-text">${formatMoney(summary.max_drawdown_ntd)}</strong></div>
       <div class="backtest-summary-card"><span>成交筆數</span><strong>${escapeHtml(summary.trade_count)}</strong></div>
+      <div class="backtest-summary-card"><span>實際總投入</span><strong>${formatMoney(summary.total_deployed_ntd)}</strong></div>
       <div class="backtest-summary-card"><span>總候選數</span><strong>${escapeHtml(summary.selection_total_candidates)}</strong></div>
       <div class="backtest-summary-card"><span>Profit Factor</span><strong>${summary.profit_factor ?? '—'}</strong></div>
       <div class="backtest-summary-card"><span>平均持有</span><strong>${summary.avg_holding_days} 天</strong></div>
@@ -1902,6 +1904,7 @@ async function runBacktest() {
   const entryMaxPct = Number(elements.backtestEntryMax.value);
   const entryMinPct = Number(elements.backtestEntryMin.value);
   const topN = Number(elements.backtestTopN.value);
+  const totalCapital = Number(elements.backtestTotalCapital.value);
 
   if (!startDate || !endDate) {
     renderBacktestEmpty('請先填入開始與結束日期。');
@@ -1933,6 +1936,11 @@ async function runBacktest() {
     setBacktestStatus('參數錯誤', 'failed');
     return;
   }
+  if (!Number.isFinite(totalCapital) || totalCapital <= 0) {
+    renderBacktestEmpty('每次訊號總投入金額請輸入大於 0 的數字。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
 
   elements.backtestRunButton.disabled = true;
   setBacktestStatus('回測中...', 'running');
@@ -1952,7 +1960,7 @@ async function runBacktest() {
         entry_min_pct: entryMinPct,
         top_n: topN,
         max_hold_days: 5,
-        shares: 1000,
+        total_capital: totalCapital,
       }),
     });
     const payload = await response.json();

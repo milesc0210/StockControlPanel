@@ -39,21 +39,54 @@ LOG_DIR = BUNDLE_DIR / "logs"
 LOG_FILE = LOG_DIR / "stock_control_panel.log"
 
 
-def emit_message(message: object) -> None:
-    text = str(message)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    with LOG_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(text)
-        if not text.endswith("\n"):
-            handle.write("\n")
+class SafeConsoleWriter:
+    def __init__(self, stream) -> None:
+        self._stream = stream
+        self._use_utf8_bytes = not self.isatty() and hasattr(stream, "buffer")
+        self.encoding = "utf-8" if self._use_utf8_bytes else (getattr(stream, "encoding", None) or "utf-8")
 
-    stream = sys.stdout
-    encoding = getattr(stream, "encoding", None) or "utf-8"
-    safe_text = text.encode(encoding, errors="backslashreplace").decode(encoding, errors="ignore")
-    try:
-        print(safe_text)
-    except UnicodeEncodeError:
-        print(text.encode("ascii", errors="backslashreplace").decode("ascii"))
+    def reconfigure(self, **_kwargs) -> None:
+        """Keep bundled scripts on UTF-8 without mutating the Windows console code page."""
+
+    def write(self, text) -> int:
+        if text is None:
+            return 0
+        value = str(text)
+        if not value:
+            return 0
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with LOG_FILE.open("a", encoding="utf-8") as handle:
+            handle.write(value)
+        if self._use_utf8_bytes:
+            self._stream.buffer.write(value.encode("utf-8"))
+            return len(value)
+        safe_text = value.encode(self.encoding, errors="backslashreplace").decode(self.encoding, errors="ignore")
+        try:
+            return self._stream.write(safe_text)
+        except UnicodeEncodeError:
+            fallback = value.encode("ascii", errors="backslashreplace").decode("ascii")
+            return self._stream.write(fallback)
+
+    def flush(self) -> None:
+        try:
+            self._stream.flush()
+        except Exception:
+            pass
+
+    def isatty(self) -> bool:
+        try:
+            return self._stream.isatty()
+        except Exception:
+            return False
+
+
+def emit_message(message: object) -> None:
+    writer = SafeConsoleWriter(sys.stdout)
+    text = str(message)
+    if not text.endswith("\n"):
+        text += "\n"
+    writer.write(text)
+    writer.flush()
 
 
 def healthcheck_ready() -> bool:
@@ -113,6 +146,10 @@ def run_script(relative_script: str, args: list[str]) -> int:
     if str(BASE_DIR) not in sys.path:
         sys.path.insert(0, str(BASE_DIR))
 
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = SafeConsoleWriter(original_stdout)
+    sys.stderr = SafeConsoleWriter(original_stderr)
     try:
         runpy.run_path(str(script_path), run_name="__main__")
         return 0
@@ -124,6 +161,9 @@ def run_script(relative_script: str, args: list[str]) -> int:
             return 0
         emit_message(code)
         return 1
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
 
 
 def open_browser() -> int:

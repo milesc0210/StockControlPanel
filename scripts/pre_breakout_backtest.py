@@ -133,6 +133,22 @@ def rank_score(grade, dist_ma5, pct, vol_ratio, up_days):
     return round(score, 2)
 
 
+def allocate_capital(total_capital: float, stock_count: int, entry_price: float):
+    """平均分配單日資金，優先整張並用零股補足可買股數。"""
+    if total_capital <= 0 or stock_count <= 0 or entry_price <= 0:
+        return {"budget": 0.0, "shares": 0, "board_lots": 0, "odd_lot_shares": 0, "cost": 0.0}
+    budget = total_capital / stock_count
+    shares = int(budget // entry_price)
+    board_lots, odd_lot_shares = divmod(shares, 1000)
+    return {
+        "budget": budget,
+        "shares": shares,
+        "board_lots": board_lots,
+        "odd_lot_shares": odd_lot_shares,
+        "cost": round(shares * entry_price, 2),
+    }
+
+
 def select_candidates(signal_date, relaxed, shared_dates, idx_of, series_by_code, prev40_high_cache, top_n: int | None = None):
     signal_index = idx_of[signal_date]
     if signal_index < 11:
@@ -260,6 +276,7 @@ def run_backtest(args):
         selection_days.append({"signal_date": signal_date, "candidate_count": len(candidates)})
 
         entry_date = shared_dates[signal_index + 1]
+        entry_candidates = []
         for candidate in candidates:
             code = candidate["code"]
             signal_bar = bars_by_date.get(signal_date, {}).get(code)
@@ -275,6 +292,15 @@ def run_backtest(args):
                 skipped.append({"reason": "entry_out_of_band", "signal_date": signal_date, "code": code})
                 continue
 
+            entry_candidates.append((candidate, signal_close, entry_close, entry_gap_pct))
+
+        for candidate, signal_close, entry_close, entry_gap_pct in entry_candidates:
+            allocation = allocate_capital(args.total_capital, len(entry_candidates), entry_close)
+            shares = allocation["shares"]
+            if shares <= 0:
+                skipped.append({"reason": "capital_below_one_share", "signal_date": signal_date, "code": candidate["code"]})
+                continue
+            code = candidate["code"]
             tp_price = entry_close * tp_mul
             sl_price = entry_close * sl_mul
             future_dates = shared_dates[signal_index + 2 : signal_index + 2 + args.max_hold_days]
@@ -312,7 +338,7 @@ def run_backtest(args):
                     break
                 exit_date, exit_price, exit_reason = future_date, float(close_price), "time_exit"
 
-            pnl = (exit_price - entry_close) * args.shares
+            pnl = (exit_price - entry_close) * shares
             ret_pct = (exit_price / entry_close - 1) * 100
             trades.append(
                 {
@@ -330,7 +356,11 @@ def run_backtest(args):
                     "pnl": round(pnl, 2),
                     "days_held": days_held,
                     "exit_reason": exit_reason,
-                    "cost": round(entry_close * args.shares, 2),
+                    "shares": shares,
+                    "board_lots": allocation["board_lots"],
+                    "odd_lot_shares": allocation["odd_lot_shares"],
+                    "budget": round(allocation["budget"], 2),
+                    "cost": allocation["cost"],
                 }
             )
 
@@ -396,11 +426,11 @@ def run_backtest(args):
             "entry_min_pct": args.entry_min_pct,
             "top_n": args.top_n,
             "max_hold_days": args.max_hold_days,
-            "shares": args.shares,
+            "total_capital": args.total_capital,
             "grade_filter": "A",
             "entry_rule": "隔日收盤、相對訊號日收盤在自訂上下限範圍內才買進",
             "same_day_rule": "同日若停利停損都觸發，先算停損",
-            "position_size_label": f"{args.shares} 股",
+            "position_size_label": f"每個訊號日 NT${args.total_capital:,.0f}，平均分配給實際進場的前 N 檔（整張＋零股）",
         },
         "summary": {
             "latest_market_date": shared_dates[-1],
@@ -426,6 +456,7 @@ def run_backtest(args):
         "selection_days_top10": sorted(selection_days, key=lambda item: item["candidate_count"], reverse=True)[:10],
         "exit_reason_counts": {key: sum(1 for trade in trades if trade["exit_reason"] == key) for key in sorted({trade["exit_reason"] for trade in trades})},
         "skip_reason_counts": {key: sum(1 for item in skipped if item["reason"] == key) for key in sorted({item["reason"] for item in skipped})},
+        "trades": trades,
         "best_trades": sorted(trades, key=lambda item: item["pnl"], reverse=True)[:10],
         "worst_trades": sorted(trades, key=lambda item: item["pnl"])[:10],
     }
@@ -442,7 +473,7 @@ def main():
     parser.add_argument("--entry-min-pct", type=float, default=-3.0)
     parser.add_argument("--top-n", type=int, default=10)
     parser.add_argument("--max-hold-days", type=int, default=5)
-    parser.add_argument("--shares", type=int, default=1000)
+    parser.add_argument("--total-capital", type=float, default=100000.0)
     args = parser.parse_args()
 
     result = run_backtest(args)
