@@ -1,7 +1,7 @@
 import io
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import stock_control_panel_boot as boot
 from scripts import pre_breakout_backtest as backtest
@@ -35,6 +35,29 @@ class CapitalAllocationTests(unittest.TestCase):
         self.assertIn('準備資金'.encode('utf-8'), response.data)
         self.assertIn(b'peak_concurrent_capital_ntd', response.data)
         response.close()
+
+    def test_run_function_accepts_frozen_child_without_stderr(self):
+        import app as app_module
+
+        conn = MagicMock()
+        conn.__enter__.return_value = conn
+        conn.execute.return_value = SimpleNamespace(lastrowid=1)
+        child = SimpleNamespace(stdout="選股完成", stderr=None, returncode=0)
+        spec = app_module.FUNCTION_MAP["limit_up_red_arrow"]
+        with patch.object(app_module, "resolve_target_date", return_value="20260724"), \
+             patch.object(app_module, "build_commands", return_value=[["screen"]]), \
+             patch.object(app_module, "snapshot_watch_dirs", return_value={}), \
+             patch.object(app_module, "detect_new_artifacts", return_value=[]), \
+             patch.object(app_module, "lookup_cache", return_value=None), \
+             patch.object(app_module, "upsert_cache"), \
+             patch.object(app_module, "get_db", return_value=conn), \
+             patch.object(app_module, "attach_institutional_cache", side_effect=lambda payload: payload), \
+             patch.object(app_module.subprocess, "run", return_value=child) as run_mock:
+            result = app_module.run_function(spec, requested_date="20260724")
+
+        self.assertEqual(run_mock.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(result["status"], "success")
+        self.assertIn("選股完成", result["output_text"])
 
     def test_backtest_preset_can_be_saved_and_loaded_globally(self):
         import app as app_module

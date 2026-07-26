@@ -2249,11 +2249,13 @@ def run_function(spec: FunctionSpec, requested_date: str | None = None, skip_cac
             cwd=MILES_AGENT_ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=os.environ.copy(),
         )
         step_header = f"$ {' '.join(command)}"
-        step_body = result.stdout.strip()
-        step_error = result.stderr.strip()
+        step_body = (result.stdout or "").strip()
+        step_error = (result.stderr or "").strip()
         section_lines = [f"## Step {step_index}", step_header]
         if step_body:
             section_lines.extend(["", step_body])
@@ -2524,7 +2526,11 @@ def api_run(function_key: str) -> Any:
         return jsonify({"error": "這個項目是展示頁，不需要執行。"}), 400
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
-    return jsonify(run_function(spec, requested_date=result_date))
+    try:
+        return jsonify(run_function(spec, requested_date=result_date))
+    except Exception as exc:
+        app.logger.exception("選股功能執行失敗: %s", function_key)
+        return jsonify({"error": f"選股執行失敗：{exc}"}), 500
 
 
 @app.route("/api/refresh_future/<function_key>", methods=["POST"])
