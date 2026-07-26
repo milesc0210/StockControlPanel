@@ -879,6 +879,16 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS backtest_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                params_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 def snapshot_watch_dirs() -> dict[str, float]:
@@ -2528,6 +2538,34 @@ def api_refresh_future(function_key: str) -> Any:
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
     return jsonify(run_function(spec, requested_date=result_date, skip_cache=True))
+
+
+@app.route("/api/backtest-presets", methods=["GET", "POST"])
+def api_backtest_presets() -> Any:
+    if request.method == "GET":
+        with get_db() as conn:
+            rows = conn.execute("SELECT id, description, params_json, created_at FROM backtest_presets ORDER BY id DESC").fetchall()
+        return jsonify({"presets": [{"id": row["id"], "description": row["description"], "params": json.loads(row["params_json"]), "created_at": row["created_at"]} for row in rows]})
+
+    payload = request.get_json(silent=True) or {}
+    description = str(payload.get("description") or "").strip()
+    params = payload.get("params")
+    if not description:
+        return jsonify({"error": "請輸入回測條件說明。"}), 400
+    if not isinstance(params, dict):
+        return jsonify({"error": "回測條件格式錯誤。"}), 400
+    created_at = taipei_now().isoformat(timespec="seconds")
+    with get_db() as conn:
+        cursor = conn.execute("INSERT INTO backtest_presets (description, params_json, created_at) VALUES (?, ?, ?)", (description, json.dumps(params, ensure_ascii=False), created_at))
+        preset_id = cursor.lastrowid
+    return jsonify({"ok": True, "preset": {"id": preset_id, "description": description, "params": params, "created_at": created_at}})
+
+
+@app.route("/api/backtest-presets/<int:preset_id>", methods=["DELETE"])
+def api_delete_backtest_preset(preset_id: int) -> Any:
+    with get_db() as conn:
+        conn.execute("DELETE FROM backtest_presets WHERE id = ?", (preset_id,))
+    return jsonify({"ok": True})
 
 
 @app.route("/api/backtest/<function_key>", methods=["POST"])

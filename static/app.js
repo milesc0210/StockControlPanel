@@ -8,6 +8,7 @@ const state = {
   currentKlineCode: '',
   fearGreed: null,
   backtestResult: null,
+  backtestPresets: [],
   serenityResult: null,
   serenityProgressTimer: null,
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
@@ -67,6 +68,11 @@ const elements = {
   backtestTopN: document.getElementById('backtest-top-n'),
   backtestTotalCapital: document.getElementById('backtest-total-capital'),
   backtestMaxHoldDays: document.getElementById('backtest-max-hold-days'),
+  backtestPresetSelect: document.getElementById('backtest-preset-select'),
+  backtestPresetDescription: document.getElementById('backtest-preset-description'),
+  backtestPresetApplyButton: document.getElementById('backtest-preset-apply-button'),
+  backtestPresetSaveButton: document.getElementById('backtest-preset-save-button'),
+  backtestPresetDeleteButton: document.getElementById('backtest-preset-delete-button'),
   backtestRunButton: document.getElementById('backtest-run-button'),
   backtestStatusPill: document.getElementById('backtest-status-pill'),
   backtestMeta: document.getElementById('backtest-meta'),
@@ -1897,6 +1903,63 @@ async function refreshCurrentView() {
   await loadCurrentResult();
 }
 
+function currentBacktestParams() {
+  return {
+    start_date: fromInputDate(elements.backtestStartDate.value), end_date: fromInputDate(elements.backtestEndDate.value),
+    take_profit_pct: Number(elements.backtestTp.value), stop_loss_pct: Number(elements.backtestSl.value),
+    entry_max_pct: Number(elements.backtestEntryMax.value), entry_min_pct: Number(elements.backtestEntryMin.value),
+    top_n: Number(elements.backtestTopN.value), total_capital: Number(elements.backtestTotalCapital.value),
+    max_hold_days: Number(elements.backtestMaxHoldDays.value),
+  };
+}
+
+function applyBacktestPreset(preset) {
+  const p = preset.params || {};
+  const fields = { start_date: elements.backtestStartDate, end_date: elements.backtestEndDate, take_profit_pct: elements.backtestTp, stop_loss_pct: elements.backtestSl, entry_max_pct: elements.backtestEntryMax, entry_min_pct: elements.backtestEntryMin, top_n: elements.backtestTopN, total_capital: elements.backtestTotalCapital, max_hold_days: elements.backtestMaxHoldDays };
+  for (const [key, field] of Object.entries(fields)) {
+    if (p[key] !== undefined && p[key] !== null) field.value = key.endsWith('_date') ? toInputDate(String(p[key])) : p[key];
+  }
+  elements.backtestPresetDescription.value = preset.description;
+  setBacktestStatus('已套用條件', 'success');
+}
+
+function renderBacktestPresets() {
+  const selected = elements.backtestPresetSelect.value;
+  elements.backtestPresetSelect.innerHTML = '<option value="">選擇已儲存的回測條件</option>' + state.backtestPresets.map((p) => `<option value="${p.id}">${escapeHtml(p.description)}</option>`).join('');
+  elements.backtestPresetSelect.value = selected;
+  elements.backtestPresetDeleteButton.disabled = !elements.backtestPresetSelect.value;
+}
+
+async function loadBacktestPresets() {
+  const response = await fetch('/api/backtest-presets');
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || '讀取回測條件失敗');
+  state.backtestPresets = payload.presets || [];
+  renderBacktestPresets();
+}
+
+async function saveBacktestPreset() {
+  const description = elements.backtestPresetDescription.value.trim();
+  if (!description) { setBacktestStatus('請輸入條件說明', 'failed'); return; }
+  const response = await fetch('/api/backtest-presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description, params: currentBacktestParams() }) });
+  const payload = await response.json();
+  if (!response.ok) { setBacktestStatus(payload.error || '儲存失敗', 'failed'); return; }
+  await loadBacktestPresets();
+  elements.backtestPresetSelect.value = String(payload.preset.id);
+  elements.backtestPresetDeleteButton.disabled = false;
+  setBacktestStatus('條件已儲存', 'success');
+}
+
+async function deleteBacktestPreset() {
+  const id = elements.backtestPresetSelect.value;
+  if (!id) return;
+  const response = await fetch(`/api/backtest-presets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!response.ok) { setBacktestStatus('刪除失敗', 'failed'); return; }
+  await loadBacktestPresets();
+  elements.backtestPresetDescription.value = '';
+  setBacktestStatus('條件已刪除', 'success');
+}
+
 async function runBacktest() {
   if (!isBacktestFunction()) return;
   const startDate = fromInputDate(elements.backtestStartDate.value);
@@ -2261,6 +2324,7 @@ async function init() {
   renderActionButtons();
   syncBacktestInputsFromDates();
   checkUpdateStatus();
+  loadBacktestPresets().catch((error) => setBacktestStatus(String(error.message || error), 'failed'));
 
   elements.refreshButton.addEventListener('click', refreshCurrentView);
   elements.serenityButton.addEventListener('click', runSerenityAnalysis);
@@ -2269,6 +2333,15 @@ async function init() {
   elements.refreshFutureButton.addEventListener('click', refreshFuture);
   elements.runButton.addEventListener('click', runSelectedFunction);
   elements.backtestRunButton.addEventListener('click', runBacktest);
+  elements.backtestPresetSaveButton.addEventListener('click', saveBacktestPreset);
+  elements.backtestPresetDeleteButton.addEventListener('click', deleteBacktestPreset);
+  elements.backtestPresetApplyButton.addEventListener('click', () => {
+    const preset = state.backtestPresets.find((item) => String(item.id) === elements.backtestPresetSelect.value);
+    if (preset) applyBacktestPreset(preset);
+  });
+  elements.backtestPresetSelect.addEventListener('change', () => {
+    elements.backtestPresetDeleteButton.disabled = !elements.backtestPresetSelect.value;
+  });
   elements.settingsButton.addEventListener('click', openSettingsModal);
   elements.selfUpdateButton.addEventListener('click', runSelfUpdate);
   elements.settingsClose.addEventListener('click', closeSettingsModal);

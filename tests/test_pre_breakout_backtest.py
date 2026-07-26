@@ -36,6 +36,22 @@ class CapitalAllocationTests(unittest.TestCase):
         self.assertIn(b'peak_concurrent_capital_ntd', response.data)
         response.close()
 
+    def test_backtest_preset_can_be_saved_and_loaded_globally(self):
+        import app as app_module
+
+        client = app_module.app.test_client()
+        saved = client.post("/api/backtest-presets", json={
+            "description": "測試用保守 5 日",
+            "params": {"take_profit_pct": 8, "stop_loss_pct": 4, "max_hold_days": 5, "top_n": 3, "total_capital": 100000},
+        })
+        self.assertEqual(saved.status_code, 200)
+        preset = saved.get_json()["preset"]
+        self.assertEqual(preset["description"], "測試用保守 5 日")
+        listed = client.get("/api/backtest-presets")
+        self.assertEqual(listed.status_code, 200)
+        self.assertIn(preset["id"], [item["id"] for item in listed.get_json()["presets"]])
+        self.assertEqual(client.delete(f"/api/backtest-presets/{preset['id']}").status_code, 200)
+
     def test_allocate_capital_splits_total_budget_and_buys_odd_lots(self):
         allocation = backtest.allocate_capital(total_capital=100000, stock_count=3, entry_price=23.4)
 

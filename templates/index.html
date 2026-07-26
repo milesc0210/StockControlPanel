@@ -118,6 +118,13 @@
             </label>
           </div>
           <div class="backtest-fixed-note">固定條件：只回測 A 級、依排序分數取前 N 名、每次訊號的總投入金額平均分配給實際進場股票，優先整張並以零股補足、同日停利停損同時觸發時先算停損。</div>
+          <div class="backtest-preset-controls">
+            <select id="backtest-preset-select" class="date-input"><option value="">選擇已儲存的回測條件</option></select>
+            <button id="backtest-preset-apply-button" class="text-button">套用條件</button>
+            <input id="backtest-preset-description" class="date-input" type="text" maxlength="120" placeholder="輸入條件說明，例如：保守 5 日">
+            <button id="backtest-preset-save-button" class="text-button">儲存回測條件</button>
+            <button id="backtest-preset-delete-button" class="text-button" disabled>刪除條件</button>
+          </div>
           <div class="backtest-actions">
             <button id="backtest-run-button" class="primary-button">執行回測</button>
             <span id="backtest-status-pill" class="status-pill neutral">待命</span>
