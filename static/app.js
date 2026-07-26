@@ -66,6 +66,7 @@ const elements = {
   backtestEntryMin: document.getElementById('backtest-entry-min'),
   backtestTopN: document.getElementById('backtest-top-n'),
   backtestTotalCapital: document.getElementById('backtest-total-capital'),
+  backtestMaxHoldDays: document.getElementById('backtest-max-hold-days'),
   backtestRunButton: document.getElementById('backtest-run-button'),
   backtestStatusPill: document.getElementById('backtest-status-pill'),
   backtestMeta: document.getElementById('backtest-meta'),
@@ -1905,6 +1906,7 @@ async function runBacktest() {
   const entryMinPct = Number(elements.backtestEntryMin.value);
   const topN = Number(elements.backtestTopN.value);
   const totalCapital = Number(elements.backtestTotalCapital.value);
+  const maxHoldDays = Number(elements.backtestMaxHoldDays.value);
 
   if (!startDate || !endDate) {
     renderBacktestEmpty('請先填入開始與結束日期。');
@@ -1941,6 +1943,11 @@ async function runBacktest() {
     setBacktestStatus('參數錯誤', 'failed');
     return;
   }
+  if (!Number.isInteger(maxHoldDays) || maxHoldDays <= 0) {
+    renderBacktestEmpty('最多持有天數請輸入大於 0 的整數。');
+    setBacktestStatus('參數錯誤', 'failed');
+    return;
+  }
 
   elements.backtestRunButton.disabled = true;
   setBacktestStatus('回測中...', 'running');
@@ -1959,7 +1966,7 @@ async function runBacktest() {
         entry_max_pct: entryMaxPct,
         entry_min_pct: entryMinPct,
         top_n: topN,
-        max_hold_days: 5,
+        max_hold_days: maxHoldDays,
         total_capital: totalCapital,
       }),
     });

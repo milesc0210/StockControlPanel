@@ -18,6 +18,14 @@ class CapitalAllocationTests(unittest.TestCase):
 
         self.assertEqual(raw.getvalue(), "台積電".encode("utf-8"))
 
+    def test_backtest_page_exposes_manual_max_holding_days(self):
+        from app import app
+
+        response = app.test_client().get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'id="backtest-max-hold-days"', response.data)
+
     def test_allocate_capital_splits_total_budget_and_buys_odd_lots(self):
         allocation = backtest.allocate_capital(total_capital=100000, stock_count=3, entry_price=23.4)
 

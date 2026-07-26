@@ -112,8 +112,12 @@
               <span>每次訊號總投入金額</span>
               <input id="backtest-total-capital" class="date-input" type="number" step="1000" min="1" value="100000">
             </label>
+            <label class="date-control">
+              <span>最多持有天數</span>
+              <input id="backtest-max-hold-days" class="date-input" type="number" step="1" min="1" value="5">
+            </label>
           </div>
-          <div class="backtest-fixed-note">固定條件：只回測 A 級、依排序分數取前 N 名、每次訊號的總投入金額平均分配給實際進場股票，優先整張並以零股補足、最多持有 5 天、同日停利停損同時觸發時先算停損。</div>
+          <div class="backtest-fixed-note">固定條件：只回測 A 級、依排序分數取前 N 名、每次訊號的總投入金額平均分配給實際進場股票，優先整張並以零股補足、同日停利停損同時觸發時先算停損。</div>
           <div class="backtest-actions">
             <button id="backtest-run-button" class="primary-button">執行回測</button>
             <span id="backtest-status-pill" class="status-pill neutral">待命</span>
