@@ -1179,6 +1179,7 @@ function renderBacktest(payload) {
       <div class="backtest-summary-card"><span>最大回撤</span><strong class="down-text">${formatMoney(summary.max_drawdown_ntd)}</strong></div>
       <div class="backtest-summary-card"><span>成交筆數</span><strong>${escapeHtml(summary.trade_count)}</strong></div>
       <div class="backtest-summary-card"><span>實際總投入</span><strong>${formatMoney(summary.total_deployed_ntd)}</strong></div>
+      <div class="backtest-summary-card"><span>準備資金</span><strong title="回測期間同時持有部位的最高實際投入金額">${formatMoney(summary.peak_concurrent_capital_ntd)}</strong></div>
       <div class="backtest-summary-card"><span>總候選數</span><strong>${escapeHtml(summary.selection_total_candidates)}</strong></div>
       <div class="backtest-summary-card"><span>Profit Factor</span><strong>${summary.profit_factor ?? '—'}</strong></div>
       <div class="backtest-summary-card"><span>平均持有</span><strong>${summary.avg_holding_days} 天</strong></div>

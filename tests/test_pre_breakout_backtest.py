@@ -26,6 +26,16 @@ class CapitalAllocationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'id="backtest-max-hold-days"', response.data)
 
+    def test_backtest_summary_displays_required_capital(self):
+        from app import app
+
+        response = app.test_client().get("/static/app.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('準備資金'.encode('utf-8'), response.data)
+        self.assertIn(b'peak_concurrent_capital_ntd', response.data)
+        response.close()
+
     def test_allocate_capital_splits_total_budget_and_buys_odd_lots(self):
         allocation = backtest.allocate_capital(total_capital=100000, stock_count=3, entry_price=23.4)
 
