@@ -1140,6 +1140,37 @@ function syncBacktestInputsFromDates() {
   elements.backtestEndDate.max = toInputDate(latest);
 }
 
+function csvCell(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function downloadBacktestCsv() {
+  const payload = state.backtestResult;
+  const trades = payload?.trades || [];
+  if (!trades.length) {
+    setBacktestStatus('沒有可匯出的交易', 'failed');
+    return;
+  }
+  const params = payload.params || {};
+  const headers = ['策略', '訊號日期', '市場', '股票代號', '股票名稱', '買進日期', '買進時間', '買進價格', '買進股數', '整張股數', '零股股數', '買進成本', '賣出日期', '賣出時間', '賣出價格', '賣出原因', '持有天數', '報酬率%', '損益', '每檔分配預算', '停利%', '停損%', '最多持有天數'];
+  const rows = trades.map((trade) => [
+    payload.function_name, formatYmd(trade.signal_date), trade.market, trade.code, trade.name,
+    formatYmd(trade.entry_date), '收盤', trade.entry_close, trade.shares, trade.board_lots * 1000, trade.odd_lot_shares, trade.cost,
+    formatYmd(trade.exit_date), trade.exit_reason === 'time_exit' ? '收盤' : '日線觸發（無分時資料）', trade.exit_price, trade.exit_reason,
+    trade.days_held, trade.ret_pct, trade.pnl, trade.budget, params.take_profit_pct, params.stop_loss_pct, params.max_hold_days,
+  ]);
+  const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `回測明細_${payload.function_key}_${params.start_date}_${params.end_date}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  setBacktestStatus('CSV 已下載', 'success');
+}
+
 function renderBacktest(payload) {
   state.backtestResult = payload;
   elements.backtestMeta.innerHTML = '';
@@ -1178,6 +1209,7 @@ function renderBacktest(payload) {
 
   elements.backtestOutput.className = 'output-box rich-output';
   elements.backtestOutput.innerHTML = `
+    <div class="backtest-export-actions"><button id="backtest-csv-download-button" class="text-button">下載回測明細 CSV</button></div>
     <div class="backtest-summary-grid">
       <div class="backtest-summary-card"><span>累計損益</span><strong class="${Number(summary.net_pnl_ntd) >= 0 ? 'up-text' : 'down-text'}">${formatMoney(summary.net_pnl_ntd)}</strong></div>
       <div class="backtest-summary-card"><span>報酬率</span><strong class="${Number(summary.aggregate_roi_pct) >= 0 ? 'up-text' : 'down-text'}">${formatSignedPercent(summary.aggregate_roi_pct)}</strong></div>
@@ -1207,6 +1239,7 @@ function renderBacktest(payload) {
       </table>
     </div>`;
 
+  elements.backtestOutput.querySelector('#backtest-csv-download-button').addEventListener('click', downloadBacktestCsv);
   setBacktestStatus('回測完成', 'success');
 }
 

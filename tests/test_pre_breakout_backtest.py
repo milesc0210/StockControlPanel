@@ -36,6 +36,17 @@ class CapitalAllocationTests(unittest.TestCase):
         self.assertIn(b'peak_concurrent_capital_ntd', response.data)
         response.close()
 
+    def test_backtest_csv_export_includes_buy_sell_datetime_and_prices(self):
+        from app import app
+
+        response = app.test_client().get("/static/app.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'downloadBacktestCsv', response.data)
+        self.assertIn('買進時間'.encode('utf-8'), response.data)
+        self.assertIn('賣出價格'.encode('utf-8'), response.data)
+        response.close()
+
     def test_run_function_accepts_frozen_child_without_stderr(self):
         import app as app_module
 
