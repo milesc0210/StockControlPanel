@@ -108,6 +108,7 @@ INTRADAY_FUNCTION_KEYS = {
     "ma_bullish_turning_point",
     "limit_up_red_arrow",
 }
+NEW_HIGH_BLACK_MIN_VOLUME_LOTS = 1000
 FEAR_GREED_FUNCTION_KEY = "cnn_fear_greed_index"
 CNN_FEAR_GREED_URL = "https://www.cnn.com/markets/fear-and-greed"
 CNN_FEAR_GREED_API_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
@@ -191,7 +192,7 @@ FUNCTIONS: list[FunctionSpec] = [
         key="new_high_black_volume_contraction",
         name="創高黑量縮",
         category="訊號型功能",
-        description="前一交易日創 30 日新高且上引收黑；指定交易日確認未再創高、量縮且收盤不低於 MA5 的 -5%，盤中則用即時行情確認。",
+        description="前一交易日創 30 日新高且上引收黑；指定交易日確認未再創高、量縮、成交量至少 1000 張且收盤不低於 MA5 的 -5%，盤中則用即時行情確認。",
         executable=True,
     ),
     FunctionSpec(
@@ -1323,6 +1324,7 @@ def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str,
         and volume_available
         and high_price <= setup_high
         and trade_volume < setup_volume
+        and trade_volume >= NEW_HIGH_BLACK_MIN_VOLUME_LOTS
         and last_price >= ma5_floor
     )
     return {

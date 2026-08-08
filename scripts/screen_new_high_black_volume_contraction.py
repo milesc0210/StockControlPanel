@@ -17,6 +17,7 @@ OUTPUT_DIR = BASE_DIR / "outputs"
 TWSE_DIR = DATA_DIR / "twse" / "2026"
 TPEX_DIR = DATA_DIR / "tpex" / "2026"
 LOOKBACK_DAYS = 30
+MIN_SIGNAL_VOLUME_LOTS = 1000
 EPS = 1e-9
 
 
@@ -296,6 +297,7 @@ def select_completed_signals(
         if (
             signal.high > candidate.setup_high
             or signal.volume_shares >= candidate.setup_volume_shares
+            or signal.volume_shares / 1000 < MIN_SIGNAL_VOLUME_LOTS
             or signal.close < ma5 * 0.95
         ):
             continue
@@ -370,7 +372,7 @@ def print_summary(
     intraday_watchlist: list[Candidate],
     output_path: Path | None,
 ) -> None:
-    print("策略：創高黑量縮（前一交易日30日新高＋上引收黑；指定交易日確認未再創高、量縮、收盤不低於MA5的-5%）")
+    print("策略：創高黑量縮（前一交易日30日新高＋上引收黑；指定交易日確認未再創高、量縮、成交量至少1000張、收盤不低於MA5的-5%）")
     print(f"比較區間：前30個交易日 → {setup_date}，訊號日 {signal_date}")
     print(f"參考前日：{setup_date}")
     print(f"訊號日期：{signal_date}")

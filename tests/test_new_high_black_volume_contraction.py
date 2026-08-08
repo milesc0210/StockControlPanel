@@ -52,11 +52,18 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertTrue(result["matched"])
         self.assertAlmostEqual(result["ma5"], 98.0)
         self.assertAlmostEqual(result["ma5_floor"], 93.1)
+        self.assertTrue(
+            stock_app.evaluate_new_high_black_intraday(
+                candidate,
+                {"lastPrice": 100, "highPrice": 104, "total": {"tradeVolume": 1000}},
+            )["matched"]
+        )
 
         for quote_override in (
             {"lastPrice": 100, "highPrice": 106, "total": {"tradeVolume": 4000}},
             {"lastPrice": 100, "highPrice": 104, "total": {"tradeVolume": 5000}},
             {"lastPrice": 80, "highPrice": 104, "total": {"tradeVolume": 4000}},
+            {"lastPrice": 100, "highPrice": 104, "total": {"tradeVolume": 999}},
             {"lastPrice": 100, "highPrice": 104, "total": {}},
         ):
             self.assertFalse(stock_app.evaluate_new_high_black_intraday(candidate, quote_override)["matched"])
@@ -150,8 +157,10 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
             return maps
 
         self.assertEqual(len(strategy.select_completed_signals(dates, build_maps(), dates[30])), 1)
+        self.assertEqual(len(strategy.select_completed_signals(dates, build_maps(signal_volume=1_000_000), dates[30])), 1)
         self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_high=106), dates[30]), [])
         self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_volume=5_000_000), dates[30]), [])
+        self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_volume=999_000), dates[30]), [])
         self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_close=70), dates[30]), [])
 
     def test_backend_registers_screen_command_and_intraday_support(self):
@@ -224,6 +233,17 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertIn("function renderNewHighBlack", javascript)
         self.assertIn("Object.values(intradayMap).filter((quote) => quote?.matched === true)", javascript)
         self.assertIn("intradaySummary.matched_count", javascript)
+
+    def test_frontend_new_high_table_uses_standard_columns_and_future_closes(self):
+        javascript = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        render_start = javascript.index("function renderNewHighBlack(")
+        render_end = javascript.index("function renderLimitUp(", render_start)
+        render_block = javascript[render_start:render_end]
+        self.assertIn("後5日", javascript)
+        self.assertIn("futureDays", render_block)
+        self.assertIn("MA5", render_block)
+        for forbidden in ("創高收黑日", "前日高點", "前日量", "訊號日", "訊號高點"):
+            self.assertNotIn(forbidden, render_block)
 
 
 if __name__ == "__main__":

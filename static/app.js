@@ -1736,26 +1736,34 @@ function renderNewHighBlack(parsed) {
     : (state.marketState?.market_open ? `尚未查詢（觀察 ${parsed.summary.watchCount || 0} 檔）` : '盤後顯示完成交易日結果');
 
   let html = `<div class="summary-grid">${buildSummaryChips({
-    '創高收黑日': parsed.summary.referenceDate,
-    '訊號日期': parsed.summary.signalDate,
-    '完成訊號': parsed.summary.count,
+    '交易日': parsed.summary.signalDate,
+    '入選數量': parsed.summary.count,
     '即時行情': intradayStatus,
   })}</div>`;
 
   if (!stocks.length) {
     html += `<div class="empty-block">${showingLive
-      ? '目前盤中沒有符合「未再創高、量縮、股價不低於 MA5 的 -5%」的股票。'
-      : '這個交易日沒有符合「前一日創高收黑，當日未再創高、量縮、收盤不低於 MA5 的 -5%」的股票。'}</div>`;
+      ? '目前盤中沒有符合未再創高、量縮、成交量至少 1000 張且股價不低於 MA5 的 -5% 的股票。'
+      : '這個交易日沒有符合未再創高、量縮、成交量至少 1000 張且收盤不低於 MA5 的 -5% 的股票。'}</div>`;
     elements.latestOutput.className = 'output-box rich-output';
     elements.latestOutput.innerHTML = html;
     return;
   }
 
+  const maxFutureDays = showingLive ? 0 : Math.max(...stocks.map((stock) => stock.futureDays.length));
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
   if (showingLive) {
-    html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">前日高點</th><th style="text-align:right">前日量</th><th style="text-align:right">即時價</th><th style="text-align:right">即時量</th><th style="text-align:right">即時MA5</th><th>狀態</th>';
+    html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">即時價</th><th style="text-align:right">即時量</th><th style="text-align:right">MA5</th><th>狀態</th>';
   } else {
-    html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th>創高收黑日</th><th style="text-align:right">前日高點</th><th style="text-align:right">前日量</th><th>訊號日</th><th style="text-align:right">訊號高點</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">MA5</th><th>狀態</th>';
+    html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">MA5</th>';
+    if (maxFutureDays > 0) {
+      const headerStock = stocks.find((stock) => stock.futureDays.length === maxFutureDays);
+      for (const day of (headerStock?.futureDays || [])) {
+        html += `<th style="text-align:center">${escapeHtml(formatYmd(day.date).slice(5))}</th>`;
+      }
+      html += '<th style="text-align:center">合計%</th>';
+    }
+    html += '<th>狀態</th>';
   }
   html += '</tr></thead><tbody>';
 
@@ -1765,8 +1773,6 @@ function renderNewHighBlack(parsed) {
       html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
       html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
       html += buildInlineKlineSlot(stock);
-      html += `<td class="td-number">${formatPrice(stock.setup_high)}</td>`;
-      html += `<td class="td-number">${formatVolume(stock.setup_volume)}</td>`;
       html += `<td class="td-number">${formatPrice(stock.last_price)}</td>`;
       html += `<td class="td-number">${formatVolume(stock.trade_volume)}</td>`;
       html += `<td class="td-number">${formatPrice(stock.ma5)}</td>`;
@@ -1776,14 +1782,24 @@ function renderNewHighBlack(parsed) {
       html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
       html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
       html += buildInlineKlineSlot(stock);
-      html += `<td>${escapeHtml(formatYmd(stock.setupDate))}</td>`;
-      html += `<td class="td-number">${escapeHtml(stock.setupHigh)}</td>`;
-      html += `<td class="td-number">${formatVolume(stock.setupVolume)}</td>`;
-      html += `<td>${escapeHtml(formatYmd(stock.signalDate))}</td>`;
-      html += `<td class="td-number">${escapeHtml(stock.signalHigh)}</td>`;
       html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
       html += `<td class="td-number">${formatVolume(stock.volume)}</td>`;
       html += `<td class="td-number">${escapeHtml(stock.ma5)}</td>`;
+      if (maxFutureDays > 0) {
+        for (let index = 0; index < maxFutureDays; index++) {
+          const day = stock.futureDays[index];
+          if (!day) {
+            html += '<td class="td-future td-empty">—</td>';
+            continue;
+          }
+          const prevCls = day.pctFromPrev.startsWith('+') ? 'up-text' : day.pctFromPrev.startsWith('-') ? 'down-text' : '';
+          html += `<td class="td-future"><strong>${escapeHtml(day.close)}</strong><span class="${prevCls}">${escapeHtml(day.pctFromPrev)}</span></td>`;
+        }
+        const lastDay = stock.futureDays[stock.futureDays.length - 1];
+        html += lastDay
+          ? `<td class="td-future td-total"><span class="${lastDay.pctFromSignal.startsWith('+') ? 'up-text' : lastDay.pctFromSignal.startsWith('-') ? 'down-text' : ''}">${escapeHtml(lastDay.pctFromSignal)}</span></td>`
+          : '<td class="td-future td-empty">—</td>';
+      }
       html += '<td><span class="status-pill success">收盤符合</span></td>';
     }
     html += '</tr>';
