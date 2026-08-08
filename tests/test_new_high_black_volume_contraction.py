@@ -105,6 +105,55 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertEqual(candidates[0].setup_high, 105)
         self.assertEqual(candidates[0].ma4_close_sum, 393)
 
+    def test_completed_signal_uses_previous_trading_day_as_setup(self):
+        dates = [f"202607{index:02d}" for index in range(1, 32)]
+        daily_maps = {}
+        for date in dates[:29]:
+            daily_maps[date] = {
+                "2330": strategy.DailyBar("twse", "2330", "台積電", date, 95, 100, 94, 98, 1_000_000),
+                "5351": strategy.DailyBar("tpex", "5351", "鈺創", date, 95, 100, 94, 98, 1_000_000),
+            }
+        daily_maps[dates[29]] = {
+            "2330": strategy.DailyBar("twse", "2330", "台積電", dates[29], 103, 105, 96, 99, 5_000_000),
+            "5351": strategy.DailyBar("tpex", "5351", "鈺創", dates[29], 95, 99, 94, 98, 4_000_000),
+        }
+        daily_maps[dates[30]] = {
+            "2330": strategy.DailyBar("twse", "2330", "台積電", dates[30], 100, 104, 98, 100, 4_000_000),
+            "5351": strategy.DailyBar("tpex", "5351", "鈺創", dates[30], 103, 105, 96, 99, 5_000_000),
+        }
+
+        matches = strategy.select_completed_signals(dates, daily_maps, dates[30])
+
+        self.assertEqual([item.code for item in matches], ["2330"])
+        self.assertEqual(matches[0].setup_date, dates[29])
+        self.assertEqual(matches[0].signal_date, dates[30])
+        self.assertAlmostEqual(matches[0].ma5, 98.6)
+
+    def test_completed_signal_requires_no_new_high_lower_volume_and_close_above_ma5_floor(self):
+        dates = [f"202607{index:02d}" for index in range(1, 32)]
+
+        def build_maps(signal_high=104, signal_volume=4_000_000, signal_close=100):
+            maps = {
+                date: {
+                    "2330": strategy.DailyBar("twse", "2330", "台積電", date, 95, 100, 94, 98, 1_000_000)
+                }
+                for date in dates[:29]
+            }
+            maps[dates[29]] = {
+                "2330": strategy.DailyBar("twse", "2330", "台積電", dates[29], 103, 105, 96, 99, 5_000_000)
+            }
+            maps[dates[30]] = {
+                "2330": strategy.DailyBar(
+                    "twse", "2330", "台積電", dates[30], 100, signal_high, 70, signal_close, signal_volume
+                )
+            }
+            return maps
+
+        self.assertEqual(len(strategy.select_completed_signals(dates, build_maps(), dates[30])), 1)
+        self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_high=106), dates[30]), [])
+        self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_volume=5_000_000), dates[30]), [])
+        self.assertEqual(strategy.select_completed_signals(dates, build_maps(signal_close=70), dates[30]), [])
+
     def test_backend_registers_screen_command_and_intraday_support(self):
         self.assertIn("new_high_black_volume_contraction", stock_app.FUNCTION_MAP)
         self.assertIn("new_high_black_volume_contraction", stock_app.INTRADAY_FUNCTION_KEYS)
@@ -118,7 +167,8 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
     def test_backend_parser_preserves_intraday_filter_inputs(self):
         self.assertTrue(hasattr(stock_app, "parse_new_high_black_candidates"))
         output = (
-            "TWSE 2330 台積電 | 20260730 O=103.00 H=105.00 L=96.00 C=99.00 "
+            "RESULT TWSE 2317 鴻海 | SETUP 20260729 O=200.00 H=205.00 L=190.00 C=195.00 V=6000.000張 | SIGNAL 20260730 O=195.00 H=204.00 L=190.00 C=200.00 V=5000.000張 MA5=198.0000 分數=9.00 | 後5日=(無後續資料)\n"
+            "WATCH TWSE 2330 台積電 | 20260730 O=103.00 H=105.00 L=96.00 C=99.00 "
             "V=5000.000張 MA4合計=393.0000 分數=10.00 | 後5日=(無後續資料)"
         )
 
@@ -132,8 +182,8 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
     def test_intraday_payload_marks_only_current_matches(self):
         output = "\n".join(
             [
-                "TWSE 2330 台積電 | 20260730 O=103.00 H=105.00 L=96.00 C=99.00 V=5000.000張 MA4合計=393.0000 分數=10.00 | 後5日=(無後續資料)",
-                "TWSE 2317 鴻海 | 20260730 O=200.00 H=205.00 L=190.00 C=195.00 V=6000.000張 MA4合計=780.0000 分數=9.00 | 後5日=(無後續資料)",
+                "WATCH TWSE 2330 台積電 | 20260730 O=103.00 H=105.00 L=96.00 C=99.00 V=5000.000張 MA4合計=393.0000 分數=10.00 | 後5日=(無後續資料)",
+                "WATCH TWSE 2317 鴻海 | 20260730 O=200.00 H=205.00 L=190.00 C=195.00 V=6000.000張 MA4合計=780.0000 分數=9.00 | 後5日=(無後續資料)",
             ]
         )
 
@@ -170,7 +220,9 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         javascript = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         self.assertIn("'new_high_black_volume_contraction'", javascript)
         self.assertIn("策略：創高黑量縮", javascript)
-        self.assertIn("intradayMap[stock.code]?.matched === true", javascript)
+        self.assertIn("function parseNewHighBlackOutput", javascript)
+        self.assertIn("function renderNewHighBlack", javascript)
+        self.assertIn("Object.values(intradayMap).filter((quote) => quote?.matched === true)", javascript)
         self.assertIn("intradaySummary.matched_count", javascript)
 
 

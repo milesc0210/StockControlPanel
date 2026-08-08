@@ -219,8 +219,13 @@ function getIntradayMap() {
 function getCurrentSerenityStocks() {
   if (!state.currentRun || state.currentRun.status !== 'success') return [];
   const text = state.currentRun.output_text || '';
-  let parsed = parseLowBaseOutput(text);
+  let parsed = parseNewHighBlackOutput(text);
   let stocks = parsed?.stocks || [];
+
+  if (!stocks.length) {
+    parsed = parseLowBaseOutput(text);
+    stocks = parsed?.stocks || [];
+  }
 
   if (!stocks.length) {
     parsed = parsePreBreakoutOutput(text);
@@ -1077,6 +1082,41 @@ function renderDateOptions() {
 }
 
 
+function parseNewHighBlackOutput(text) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (!lines.some((line) => line.startsWith('策略：創高黑量縮'))) return null;
+
+  const summary = {};
+  const stocks = [];
+  for (const line of lines) {
+    if (line.startsWith('比較區間：')) summary.range = line.replace('比較區間：', '').trim();
+    if (line.startsWith('參考前日：')) summary.referenceDate = line.replace('參考前日：', '').trim();
+    if (line.startsWith('訊號日期：')) summary.signalDate = line.replace('訊號日期：', '').trim();
+    if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
+    if (line.startsWith('盤中觀察數量：')) summary.watchCount = line.replace('盤中觀察數量：', '').trim();
+
+    const match = line.match(/^RESULT\s+(TWSE|TPEX)\s+([0-9A-Z]+)\s+(.+?)\s+\|\s+SETUP\s+(\d{8})\s+O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+V=([\d.]+)張\s+\|\s+SIGNAL\s+(\d{8})\s+O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+V=([\d.]+)張\s+MA5=([\d.]+)\s+分數=([\d.]+)\s+\|\s+後5日=(.+)$/);
+    if (!match) continue;
+    const futureText = match[18].trim();
+    const futureDays = futureText === '(無後續資料)'
+      ? []
+      : futureText.split(/,\s*/).map((entry) => {
+          const future = entry.match(/^(\d{8}):([\d.]+)\/([+-]\d+\.\d+%)\/([+-]\d+\.\d+%)$/);
+          return future ? {
+            date: future[1], close: future[2], pctFromSignal: future[3], pctFromPrev: future[4],
+          } : null;
+        }).filter(Boolean);
+    stocks.push({
+      market: match[1], code: match[2], name: match[3],
+      setupDate: match[4], setupOpen: match[5], setupHigh: match[6], setupLow: match[7],
+      setupClose: match[8], setupVolume: match[9], signalDate: match[10], signalOpen: match[11],
+      signalHigh: match[12], signalLow: match[13], close: match[14], volume: match[15],
+      ma5: match[16], rankScore: match[17], futureDays,
+    });
+  }
+  return { type: 'new_high_black', summary, stocks };
+}
+
 function parseLimitUpOutput(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   if (!lines.some((line) => line.includes('策略：前一交易日漲停') || line.includes('策略：指定日期漲停') || line.includes('策略：創高黑量縮'))) return null;
@@ -1683,6 +1723,77 @@ function buildSummaryChips(summary) {
     .join('');
 }
 
+function renderNewHighBlack(parsed) {
+  const intradayMap = getIntradayMap();
+  const intradaySummary = state.currentRun?.intraday?.payload;
+  const liveStocks = intradaySummary
+    ? Object.values(intradayMap).filter((quote) => quote?.matched === true)
+    : [];
+  const showingLive = Boolean(intradaySummary);
+  const stocks = showingLive ? liveStocks : sortStocksByRankScore(parsed.stocks);
+  const intradayStatus = intradaySummary
+    ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
+    : (state.marketState?.market_open ? `尚未查詢（觀察 ${parsed.summary.watchCount || 0} 檔）` : '盤後顯示完成交易日結果');
+
+  let html = `<div class="summary-grid">${buildSummaryChips({
+    '創高收黑日': parsed.summary.referenceDate,
+    '訊號日期': parsed.summary.signalDate,
+    '完成訊號': parsed.summary.count,
+    '即時行情': intradayStatus,
+  })}</div>`;
+
+  if (!stocks.length) {
+    html += `<div class="empty-block">${showingLive
+      ? '目前盤中沒有符合「未再創高、量縮、股價不低於 MA5 的 -5%」的股票。'
+      : '這個交易日沒有符合「前一日創高收黑，當日未再創高、量縮、收盤不低於 MA5 的 -5%」的股票。'}</div>`;
+    elements.latestOutput.className = 'output-box rich-output';
+    elements.latestOutput.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  if (showingLive) {
+    html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">前日高點</th><th style="text-align:right">前日量</th><th style="text-align:right">即時價</th><th style="text-align:right">即時量</th><th style="text-align:right">即時MA5</th><th>狀態</th>';
+  } else {
+    html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th>創高收黑日</th><th style="text-align:right">前日高點</th><th style="text-align:right">前日量</th><th>訊號日</th><th style="text-align:right">訊號高點</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">MA5</th><th>狀態</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const stock of stocks) {
+    html += '<tr>';
+    if (showingLive) {
+      html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
+      html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
+      html += buildInlineKlineSlot(stock);
+      html += `<td class="td-number">${formatPrice(stock.setup_high)}</td>`;
+      html += `<td class="td-number">${formatVolume(stock.setup_volume)}</td>`;
+      html += `<td class="td-number">${formatPrice(stock.last_price)}</td>`;
+      html += `<td class="td-number">${formatVolume(stock.trade_volume)}</td>`;
+      html += `<td class="td-number">${formatPrice(stock.ma5)}</td>`;
+      html += '<td><span class="status-pill success">盤中符合</span></td>';
+    } else {
+      html += `<td class="td-number td-score">${escapeHtml(stock.rankScore)}</td>`;
+      html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
+      html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
+      html += buildInlineKlineSlot(stock);
+      html += `<td>${escapeHtml(formatYmd(stock.setupDate))}</td>`;
+      html += `<td class="td-number">${escapeHtml(stock.setupHigh)}</td>`;
+      html += `<td class="td-number">${formatVolume(stock.setupVolume)}</td>`;
+      html += `<td>${escapeHtml(formatYmd(stock.signalDate))}</td>`;
+      html += `<td class="td-number">${escapeHtml(stock.signalHigh)}</td>`;
+      html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
+      html += `<td class="td-number">${formatVolume(stock.volume)}</td>`;
+      html += `<td class="td-number">${escapeHtml(stock.ma5)}</td>`;
+      html += '<td><span class="status-pill success">收盤符合</span></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  elements.latestOutput.className = 'output-box rich-output';
+  elements.latestOutput.innerHTML = html;
+  hydrateInlineKlines(stocks);
+}
+
 function renderLimitUp(parsed) {
   const enrichedStocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
   const rankedStocks = sortStocksByRankScore(enrichedStocks);
@@ -2074,6 +2185,12 @@ function renderMaBullish(parsed) {
 
 function renderOutput(run) {
   const text = run.output_text || '(無輸出)';
+  const parsedNewHighBlack = parseNewHighBlackOutput(text);
+  if (parsedNewHighBlack && run.status === 'success') {
+    renderNewHighBlack(parsedNewHighBlack);
+    return;
+  }
+
   const parsedLowBase = parseLowBaseOutput(text);
   if (parsedLowBase && run.status === 'success') {
     renderLowBase(parsedLowBase);

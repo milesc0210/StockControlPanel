@@ -53,6 +53,28 @@ class Candidate:
     future_days: list[dict[str, object]]
 
 
+@dataclass
+class CompletedSignal:
+    market: str
+    code: str
+    name: str
+    setup_date: str
+    setup_open: float
+    setup_high: float
+    setup_low: float
+    setup_close: float
+    setup_volume_lots: float
+    signal_date: str
+    signal_open: float
+    signal_high: float
+    signal_low: float
+    signal_close: float
+    signal_volume_lots: float
+    ma5: float
+    rank_score: float
+    future_days: list[dict[str, object]]
+
+
 def parse_num(value: object) -> float | None:
     text = str(value).strip().replace(",", "").replace("--", "")
     if not text:
@@ -250,48 +272,128 @@ def select_setup_candidates(
     return sorted(candidates, key=lambda item: (-item.rank_score, item.market, item.code))
 
 
-def resolve_setup_date(requested_date: str | None) -> tuple[list[str], str]:
+def select_completed_signals(
+    dates: list[str],
+    daily_maps: dict[str, dict[str, DailyBar]],
+    signal_date: str,
+) -> list[CompletedSignal]:
+    if signal_date not in dates:
+        raise ValueError(f"找不到 signal_date={signal_date}。")
+    signal_index = dates.index(signal_date)
+    if signal_index < LOOKBACK_DAYS:
+        raise ValueError(f"signal_date={signal_date} 前不足 {LOOKBACK_DAYS} 個交易日。")
+
+    setup_date = dates[signal_index - 1]
+    setup_candidates = select_setup_candidates(dates, daily_maps, setup_date)
+    signal_map = daily_maps.get(signal_date, {})
+    future_dates = dates[signal_index + 1:signal_index + 6]
+    matches: list[CompletedSignal] = []
+    for candidate in setup_candidates:
+        signal = signal_map.get(candidate.code)
+        if signal is None:
+            continue
+        ma5 = (candidate.ma4_close_sum + signal.close) / 5
+        if (
+            signal.high > candidate.setup_high
+            or signal.volume_shares >= candidate.setup_volume_shares
+            or signal.close < ma5 * 0.95
+        ):
+            continue
+        matches.append(
+            CompletedSignal(
+                market=candidate.market,
+                code=candidate.code,
+                name=candidate.name,
+                setup_date=candidate.setup_date,
+                setup_open=candidate.setup_open,
+                setup_high=candidate.setup_high,
+                setup_low=candidate.setup_low,
+                setup_close=candidate.setup_close,
+                setup_volume_lots=candidate.setup_volume_lots,
+                signal_date=signal.date,
+                signal_open=signal.open,
+                signal_high=signal.high,
+                signal_low=signal.low,
+                signal_close=signal.close,
+                signal_volume_lots=round(signal.volume_shares / 1000, 3),
+                ma5=round(ma5, 4),
+                rank_score=candidate.rank_score,
+                future_days=build_future_days(candidate.code, signal.close, future_dates, daily_maps),
+            )
+        )
+    return sorted(matches, key=lambda item: (-item.rank_score, item.market, item.code))
+
+
+def resolve_signal_date(requested_date: str | None) -> tuple[list[str], str]:
     dates = available_dates()
-    if len(dates) < LOOKBACK_DAYS:
-        raise SystemExit(f"可用共同交易日不足 {LOOKBACK_DAYS} 天。")
-    setup_date = requested_date or dates[-1]
-    if setup_date not in dates:
-        raise SystemExit(f"找不到 date={setup_date} 的 TWSE/TPEX 共同資料。")
-    if dates.index(setup_date) < LOOKBACK_DAYS - 1:
-        raise SystemExit(f"date={setup_date} 前不足 {LOOKBACK_DAYS - 1} 個交易日。")
-    return dates, setup_date
+    if len(dates) <= LOOKBACK_DAYS:
+        raise SystemExit(f"可用共同交易日不足 {LOOKBACK_DAYS + 1} 天。")
+    signal_date = requested_date or dates[-1]
+    if signal_date not in dates:
+        raise SystemExit(f"找不到 date={signal_date} 的 TWSE/TPEX 共同資料。")
+    if dates.index(signal_date) < LOOKBACK_DAYS:
+        raise SystemExit(f"date={signal_date} 前不足 {LOOKBACK_DAYS} 個交易日。")
+    return dates, signal_date
 
 
-def write_output(setup_date: str, candidates: list[Candidate]) -> Path:
+def write_output(
+    signal_date: str,
+    setup_date: str,
+    matches: list[CompletedSignal],
+    intraday_watchlist: list[Candidate],
+) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUTPUT_DIR / f"screen_new_high_black_volume_contraction_{setup_date}.json"
+    path = OUTPUT_DIR / f"screen_new_high_black_volume_contraction_{signal_date}.json"
     payload = {
-        "strategy": "new_30d_high_black_upper_wick_then_intraday_volume_contraction",
+        "strategy": "previous_day_new_high_black_then_completed_or_intraday_confirmation",
         "setup_date": setup_date,
-        "count": len(candidates),
-        "candidates": [asdict(item) for item in candidates],
+        "signal_date": signal_date,
+        "count": len(matches),
+        "matches": [asdict(item) for item in matches],
+        "intraday_watchlist": [asdict(item) for item in intraday_watchlist],
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 
-def format_future_days(candidate: Candidate) -> str:
+def format_future_days(candidate: Candidate | CompletedSignal) -> str:
     return ", ".join(
         f"{row['date']}:{row['close']:.2f}/{row['pct_from_signal']:+.2f}%/{row['pct_from_prev']:+.2f}%"
         for row in candidate.future_days
     ) or "(無後續資料)"
 
 
-def print_summary(setup_date: str, candidates: list[Candidate], output_path: Path | None) -> None:
-    print("策略：創高黑量縮（前一日30日新高＋上引收黑，盤中確認未再創高、量縮、股價不低於MA5的-5%）")
-    print(f"比較區間：前30個交易日 → {setup_date}")
+def print_summary(
+    signal_date: str,
+    setup_date: str,
+    matches: list[CompletedSignal],
+    intraday_watchlist: list[Candidate],
+    output_path: Path | None,
+) -> None:
+    print("策略：創高黑量縮（前一交易日30日新高＋上引收黑；指定交易日確認未再創高、量縮、收盤不低於MA5的-5%）")
+    print(f"比較區間：前30個交易日 → {setup_date}，訊號日 {signal_date}")
     print(f"參考前日：{setup_date}")
-    print(f"入選數量：{len(candidates)}")
+    print(f"訊號日期：{signal_date}")
+    print(f"入選數量：{len(matches)}")
+    print(f"盤中觀察前日：{signal_date}")
+    print(f"盤中觀察數量：{len(intraday_watchlist)}")
     print(f"輸出檔案：{output_path if output_path else 'DB cache only'}")
     print()
-    for item in candidates:
+    for item in matches:
         print(
-            f"{item.market.upper():4s} {item.code} {item.name} | "
+            f"RESULT {item.market.upper():4s} {item.code} {item.name} | "
+            f"SETUP {item.setup_date} O={item.setup_open:.2f} H={item.setup_high:.2f} "
+            f"L={item.setup_low:.2f} C={item.setup_close:.2f} V={item.setup_volume_lots:.3f}張 | "
+            f"SIGNAL {item.signal_date} O={item.signal_open:.2f} H={item.signal_high:.2f} "
+            f"L={item.signal_low:.2f} C={item.signal_close:.2f} V={item.signal_volume_lots:.3f}張 "
+            f"MA5={item.ma5:.4f} 分數={item.rank_score:.2f} | "
+            f"後5日={format_future_days(item)}"
+        )
+    if matches:
+        print()
+    for item in intraday_watchlist:
+        print(
+            f"WATCH {item.market.upper():4s} {item.code} {item.name} | "
             f"{item.setup_date} O={item.setup_open:.2f} H={item.setup_high:.2f} "
             f"L={item.setup_low:.2f} C={item.setup_close:.2f} V={item.setup_volume_lots:.3f}張 "
             f"MA4合計={item.ma4_close_sum:.4f} 分數={item.rank_score:.2f} | "
@@ -300,18 +402,20 @@ def print_summary(setup_date: str, candidates: list[Candidate], output_path: Pat
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="創高黑量縮：建立盤中即時確認用候選清單")
-    parser.add_argument("--date", help="訊號前日 YYYYMMDD，預設使用本地最新完整交易日")
+    parser = argparse.ArgumentParser(description="創高黑量縮：檢查完成交易日訊號並建立下一交易日盤中觀察清單")
+    parser.add_argument("--date", help="訊號交易日 YYYYMMDD，預設使用本地最新完整交易日")
     parser.add_argument("--no-save", action="store_true", help="只輸出 stdout，不寫 JSON")
     args = parser.parse_args()
 
-    dates, setup_date = resolve_setup_date(args.date)
-    setup_index = dates.index(setup_date)
-    required_dates = dates[max(0, setup_index - LOOKBACK_DAYS + 1):setup_index + 6]
+    dates, signal_date = resolve_signal_date(args.date)
+    signal_index = dates.index(signal_date)
+    setup_date = dates[signal_index - 1]
+    required_dates = dates[max(0, signal_index - LOOKBACK_DAYS):signal_index + 6]
     daily_maps = {date_str: load_market(date_str) for date_str in required_dates}
-    candidates = select_setup_candidates(dates, daily_maps, setup_date)
-    output_path = None if args.no_save else write_output(setup_date, candidates)
-    print_summary(setup_date, candidates, output_path)
+    matches = select_completed_signals(dates, daily_maps, signal_date)
+    intraday_watchlist = select_setup_candidates(dates, daily_maps, signal_date)
+    output_path = None if args.no_save else write_output(signal_date, setup_date, matches, intraday_watchlist)
+    print_summary(signal_date, setup_date, matches, intraday_watchlist, output_path)
 
 
 if __name__ == "__main__":

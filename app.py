@@ -191,7 +191,7 @@ FUNCTIONS: list[FunctionSpec] = [
         key="new_high_black_volume_contraction",
         name="創高黑量縮",
         category="訊號型功能",
-        description="前一日創 30 日新高且上引收黑，盤中確認未再創高、量縮且股價不低於 MA5 的 -5%。",
+        description="前一交易日創 30 日新高且上引收黑；指定交易日確認未再創高、量縮且收盤不低於 MA5 的 -5%，盤中則用即時行情確認。",
         executable=True,
     ),
     FunctionSpec(
@@ -1005,6 +1005,11 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
     if function_key == "today_limit_up" and "策略：今日漲停 快速族群分析" not in output_text:
         return None
     if (
+        function_key == "new_high_black_volume_contraction"
+        and ("訊號日期：" not in output_text or "盤中觀察數量：" not in output_text)
+    ):
+        return None
+    if (
         function_key == "ma_bullish_turning_point"
         and "策略：0121 快速族群分析" not in output_text
         and "族群快速分類整合失敗：" not in output_text
@@ -1266,7 +1271,7 @@ def parse_ma_bullish_candidates(output_text: str) -> list[dict[str, str]]:
 
 def parse_new_high_black_candidates(output_text: str) -> list[dict[str, str]]:
     pattern = re.compile(
-        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+(\d{8})\s+"
+        r"^WATCH\s+(TWSE|TPEX)\s+([0-9A-Z]+)\s+(.+?)\s+\|\s+(\d{8})\s+"
         r"O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+"
         r"V=([\d.]+)張\s+MA4合計=([\d.]+)\s+分數=([\d.]+)\s+\|\s+後5日=(.+)$"
     )
@@ -1397,6 +1402,7 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
             quote_payload = {
                 "code": code,
                 "name": stock["name"],
+                "market": stock.get("market", ""),
                 "last_price": quote.get("lastPrice") or quote.get("closePrice"),
                 "trade_volume": total.get("tradeVolume"),
                 "change_percent": quote.get("changePercent"),
