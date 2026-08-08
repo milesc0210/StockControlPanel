@@ -61,6 +61,32 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         ):
             self.assertFalse(stock_app.evaluate_new_high_black_intraday(candidate, quote_override)["matched"])
 
+    def test_intraday_rejects_boolean_quote_fields(self):
+        candidate = {
+            "setup_high": "105",
+            "setup_volume": "5000",
+            "ma4_close_sum": "390",
+        }
+        for quote in (
+            {"lastPrice": 100, "highPrice": True, "total": {"tradeVolume": 4000}},
+            {"lastPrice": 100, "highPrice": 104, "total": {"tradeVolume": False}},
+        ):
+            self.assertFalse(stock_app.evaluate_new_high_black_intraday(candidate, quote)["matched"])
+
+    def test_intraday_rejects_non_finite_quote_fields(self):
+        candidate = {
+            "setup_high": "105",
+            "setup_volume": "5000",
+            "ma4_close_sum": "390",
+        }
+        quote = {
+            "lastPrice": float("inf"),
+            "highPrice": 104,
+            "total": {"tradeVolume": 4000},
+        }
+
+        self.assertFalse(stock_app.evaluate_new_high_black_intraday(candidate, quote)["matched"])
+
     def test_screen_builds_intraday_watchlist_from_setup_day(self):
         self.assertTrue(hasattr(strategy, "select_setup_candidates"))
         dates = [f"202607{index:02d}" for index in range(1, 31)]

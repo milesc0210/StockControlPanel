@@ -1292,22 +1292,29 @@ def parse_new_high_black_candidates(output_text: str) -> list[dict[str, str]]:
 
 
 def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str, Any]) -> dict[str, Any]:
-    last_price = float(quote.get("lastPrice") or quote.get("closePrice") or 0)
-    high_price = float(quote.get("highPrice") or 0)
+    def finite_quote_number(value: Any, *, allow_zero: bool = False) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        number = float(value)
+        if not math.isfinite(number) or number < 0 or (number == 0 and not allow_zero):
+            return None
+        return number
+
+    last_price = finite_quote_number(quote.get("lastPrice"))
+    if last_price is None:
+        last_price = finite_quote_number(quote.get("closePrice"))
+    high_price = finite_quote_number(quote.get("highPrice"))
     raw_trade_volume = (quote.get("total") or {}).get("tradeVolume")
-    try:
-        trade_volume = float(raw_trade_volume)
-    except (TypeError, ValueError):
-        trade_volume = None
-    volume_available = trade_volume is not None and math.isfinite(trade_volume) and trade_volume >= 0
+    trade_volume = finite_quote_number(raw_trade_volume, allow_zero=True)
+    volume_available = trade_volume is not None
     setup_high = float(candidate.get("setup_high") or 0)
     setup_volume = float(candidate.get("setup_volume") or 0)
     ma4_close_sum = float(candidate.get("ma4_close_sum") or 0)
-    ma5 = (ma4_close_sum + last_price) / 5 if last_price > 0 else 0
+    ma5 = (ma4_close_sum + last_price) / 5 if last_price is not None else 0
     ma5_floor = ma5 * 0.95
     matched = (
-        last_price > 0
-        and high_price > 0
+        last_price is not None
+        and high_price is not None
         and volume_available
         and high_price <= setup_high
         and trade_volume < setup_volume
@@ -1317,7 +1324,7 @@ def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str,
         "matched": matched,
         "ma5": round(ma5, 4),
         "ma5_floor": round(ma5_floor, 4),
-        "intraday_high": high_price,
+        "intraday_high": high_price or 0,
         "setup_high": setup_high,
         "setup_volume": setup_volume,
         "volume_available": volume_available,
