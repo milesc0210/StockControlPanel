@@ -16,6 +16,13 @@ const state = {
   updateStatusChecked: false,
 };
 
+const LIGHTWEIGHT_CHARTS_SCRIPT = 'https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js';
+const LIGHTWEIGHT_CHARTS_INTEGRITY = 'sha384-q1KYLSKHgBnW5tWYGGR8+6YV4/iPy31dILoF2I1OD7XiVUvHEp/TaxIQVmB0j3R2';
+const KLINE_CHART_LOOKBACK_DAYS = 1000;
+let lightweightChartsPromise = null;
+let activeKlineChart = null;
+let activeKlineResizeObserver = null;
+let klineRequestSerial = 0;
 const KLINE_MODAL_CACHE_MAX_ENTRIES = 120;
 const klineModalCache = new Map();
 
@@ -188,6 +195,7 @@ function isFearGreedFunction(functionKey = state.selectedKey) {
 
 function isIntradayFunction(functionKey = state.selectedKey) {
   return [
+    'new_high_black_volume_contraction',
     'low_base_turnaround',
     'pre_breakout_conservative',
     'pre_breakout_standard',
@@ -503,7 +511,7 @@ function toneClassFromNumber(value) {
 }
 
 function buildCodeButton(stock) {
-  return `<button class="stock-code-button" data-stock-code="${escapeHtml(stock.code)}" data-stock-name="${escapeHtml(stock.name)}">${escapeHtml(stock.code)}</button>`;
+  return `<button class="stock-code-button" data-stock-code="${escapeHtml(stock.code)}" data-stock-name="${escapeHtml(stock.name)}" data-stock-market="${escapeHtml(stock.market || '')}">${escapeHtml(stock.code)}</button>`;
 }
 
 function buildInlineKlineSlot(stock) {
@@ -589,9 +597,23 @@ async function hydrateInlineKlines(stocks) {
   }
 }
 
+function clearLightweightKlineChart() {
+  if (activeKlineResizeObserver) {
+    activeKlineResizeObserver.disconnect();
+    activeKlineResizeObserver = null;
+  }
+  if (activeKlineChart) {
+    activeKlineChart.remove();
+    activeKlineChart = null;
+  }
+}
+
 function closeKlineModal() {
+  klineRequestSerial += 1;
+  clearLightweightKlineChart();
   elements.klineModal.classList.add('hidden');
   elements.klineModal.setAttribute('aria-hidden', 'true');
+  elements.klineModalBody.replaceChildren();
   state.currentKlineCode = '';
 }
 
@@ -622,13 +644,13 @@ function setCachedKlineModalPayload(payload, endDate, lookbackDays = 60) {
   }
 }
 
-function openKlineModalShell(code, name) {
+function openKlineModalShell(code, name, market) {
   state.currentKlineCode = code;
   elements.klineModal.classList.remove('hidden');
   elements.klineModal.setAttribute('aria-hidden', 'false');
-  elements.klineModalTitle.textContent = `${code} ${name}｜60 日 K 線圖`;
-  elements.klineModalMeta.textContent = `截至 ${formatYmd(state.selectedDate)} ｜ 載入中...`;
-  elements.klineModalBody.innerHTML = '<div class="kline-loading">K 線資料載入中...</div>';
+  elements.klineModalTitle.textContent = `${code} ${name}｜TradingView K 線圖`;
+  elements.klineModalMeta.textContent = `${market || '台股'} ｜ TradingView 日線 ｜ 連線中...`;
+  elements.klineModalBody.innerHTML = '<div class="kline-loading">正在載入 TradingView K 線圖...</div>';
 }
 
 function linePath(points) {
@@ -746,34 +768,264 @@ function renderKlineModal(payload) {
     </div>`;
 }
 
-async function openKlineModal(code, name) {
-  if (!code) return;
-  const lookbackDays = 60;
-  openKlineModalShell(code, name || '');
+function renderLocalKlineFallback(payload) {
+  const fallbackCount = Math.min(60, (payload.rows || []).length);
+  const sliceStart = Math.max(0, (payload.rows || []).length - fallbackCount);
+  const fallbackPayload = {
+    ...payload,
+    rows: (payload.rows || []).slice(sliceStart),
+    ma5: (payload.ma5 || []).slice(sliceStart),
+    ma10: (payload.ma10 || []).slice(sliceStart),
+    ma20: (payload.ma20 || []).slice(sliceStart),
+    start_date: (payload.rows || [])[sliceStart]?.date || payload.start_date,
+    count: fallbackCount,
+  };
+  renderKlineModal(fallbackPayload);
+  elements.klineModalMeta.textContent += ' ｜ TradingView 元件無法載入，已改用本機 K 線圖';
+}
 
-  const cachedPayload = getCachedKlineModalPayload(code, state.selectedDate, lookbackDays);
-  if (cachedPayload) {
-    if (state.currentKlineCode !== code) return;
-    renderKlineModal(cachedPayload);
+function loadLightweightCharts() {
+  const hasV5Series = (library) => Boolean(
+    library?.createChart
+    && library?.CandlestickSeries
+    && library?.HistogramSeries
+  );
+  if (hasV5Series(window.LightweightCharts)) return Promise.resolve(window.LightweightCharts);
+  if (lightweightChartsPromise) return lightweightChartsPromise;
+
+  lightweightChartsPromise = new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find((item) => item.src === LIGHTWEIGHT_CHARTS_SCRIPT);
+    const script = existing || document.createElement('script');
+    let timeoutId = null;
+    const rejectAndReset = (error) => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      lightweightChartsPromise = null;
+      script.remove();
+      reject(error);
+    };
+    const finish = () => {
+      if (hasV5Series(window.LightweightCharts)) {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        resolve(window.LightweightCharts);
+      } else {
+        rejectAndReset(new Error('TradingView Lightweight Charts v5.2 載入後找不到系列定義。'));
+      }
+    };
+
+    script.addEventListener('load', finish, { once: true });
+    script.addEventListener('error', () => rejectAndReset(new Error('TradingView Lightweight Charts 載入失敗。')), { once: true });
+    timeoutId = window.setTimeout(
+      () => rejectAndReset(new Error('TradingView Lightweight Charts 載入逾時。')),
+      8000,
+    );
+    if (!existing) {
+      script.src = LIGHTWEIGHT_CHARTS_SCRIPT;
+      script.integrity = LIGHTWEIGHT_CHARTS_INTEGRITY;
+      script.crossOrigin = 'anonymous';
+      script.async = true;
+      document.head.appendChild(script);
+    } else if (window.LightweightCharts) {
+      finish();
+    }
+  });
+  return lightweightChartsPromise;
+}
+
+function buildTradingViewSymbol(code, market) {
+  const normalizedCode = String(code || '').trim();
+  const normalizedMarket = String(market || '').trim().toUpperCase();
+  if (!/^\d{4,6}$/.test(normalizedCode)) return '';
+  const exchangePrefixes = { TWSE: 'TWSE:', TPEX: 'TPEX:' };
+  const prefix = exchangePrefixes[normalizedMarket];
+  return prefix ? `${prefix}${normalizedCode}` : '';
+}
+
+function formatKlineTime(value) {
+  const text = String(value || '').trim();
+  if (/^\d{8}$/.test(text)) return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
+  return text.replaceAll('/', '-');
+}
+
+function buildTradingViewSymbolUrl(symbol) {
+  const [exchange, code] = String(symbol || '').split(':');
+  if (!exchange || !code) return 'https://www.tradingview.com/';
+  return `https://www.tradingview.com/symbols/${encodeURIComponent(exchange)}-${encodeURIComponent(code)}/`;
+}
+
+function buildKlineLineData(rowEntries, values) {
+  if (!Array.isArray(values)) return [];
+  return rowEntries.map(({ row, index }) => {
+    const rawValue = values[index];
+    if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return null;
+    return { time: formatKlineTime(row.date), value };
+  }).filter(Boolean);
+}
+
+function renderTradingViewKline(payload, lightweightCharts, symbol) {
+  const rowEntries = (payload.rows || [])
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row && [row.open, row.high, row.low, row.close, row.volume].every((value) => Number.isFinite(Number(value))));
+  const rows = rowEntries.map(({ row }) => row);
+  if (!rows.length) {
+    elements.klineModalBody.innerHTML = '<div class="empty-block">目前沒有可顯示的長期 K 線資料。</div>';
     return;
   }
 
+  clearLightweightKlineChart();
+  const latest = rows[rows.length - 1];
+  const chartWrap = document.createElement('div');
+  chartWrap.className = 'tradingview-chart-wrap';
+  const reading = document.createElement('div');
+  reading.className = 'tradingview-kline-reading';
+  reading.textContent = `最新收盤 ${formatPrice(latest.close)} ｜ 開 ${formatPrice(latest.open)}　高 ${formatPrice(latest.high)}　低 ${formatPrice(latest.low)}　量 ${formatVolume(latest.volume)}`;
+  const legend = document.createElement('div');
+  legend.className = 'tradingview-kline-legend';
+  legend.innerHTML = `
+    <span><i class="tradingview-kline-legend-line ma5"></i>MA5</span>
+    <span><i class="tradingview-kline-legend-line ma10"></i>MA10</span>
+    <span><i class="tradingview-kline-legend-line ma20"></i>MA20</span>`;
+
+  const chartMount = document.createElement('div');
+  chartMount.className = 'tradingview-chart-mount';
+  const attribution = document.createElement('div');
+  attribution.className = 'tradingview-widget-copyright';
+  const tradingViewLink = buildTradingViewSymbolUrl(symbol);
+  attribution.innerHTML = `<a href="https://tradingview.github.io/lightweight-charts/" target="_blank" rel="noopener nofollow"><span class="blue-text">TradingView Lightweight Charts</span></a> · <a href="${tradingViewLink}" target="_blank" rel="noopener nofollow">在 TradingView 查看完整圖表</a>`;
+  chartWrap.append(reading, legend, chartMount, attribution);
+  elements.klineModalBody.replaceChildren(chartWrap);
+
+  const chart = lightweightCharts.createChart(chartMount, {
+    width: chartMount.clientWidth || 900,
+    height: chartMount.clientHeight || 520,
+    layout: {
+      background: { type: 'solid', color: '#ffffff' },
+      textColor: '#64748b',
+    },
+    grid: {
+      vertLines: { color: '#eef2f7' },
+      horzLines: { color: '#eef2f7' },
+    },
+    rightPriceScale: { borderColor: '#dfe7f7' },
+    timeScale: {
+      borderColor: '#dfe7f7',
+      timeVisible: false,
+      secondsVisible: false,
+      rightOffset: 4,
+    },
+    crosshair: {
+      mode: lightweightCharts.CrosshairMode?.Normal ?? 0,
+    },
+    handleScale: {
+      mouseWheel: true,
+      pinch: true,
+      axisPressedMouseMove: true,
+    },
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: true,
+    },
+  });
+
+  const candleSeries = chart.addSeries(lightweightCharts.CandlestickSeries, {
+    upColor: '#c83f49',
+    downColor: '#1e8e5a',
+    borderUpColor: '#c83f49',
+    borderDownColor: '#1e8e5a',
+    wickUpColor: '#c83f49',
+    wickDownColor: '#1e8e5a',
+  });
+  candleSeries.setData(rows.map((row) => ({
+    time: formatKlineTime(row.date),
+    open: Number(row.open),
+    high: Number(row.high),
+    low: Number(row.low),
+    close: Number(row.close),
+  })));
+
+  const movingAverageSeries = [
+    { label: 'MA5', color: '#1f77b4', values: payload.ma5 },
+    { label: 'MA10', color: '#ff7f0e', values: payload.ma10 },
+    { label: 'MA20', color: '#222222', values: payload.ma20 },
+  ];
+  for (const movingAverage of movingAverageSeries) {
+    const series = chart.addSeries(lightweightCharts.LineSeries, {
+      color: movingAverage.color,
+      lineWidth: 2,
+      title: movingAverage.label,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    series.setData(buildKlineLineData(rowEntries, movingAverage.values));
+  }
+
+  const volumeSeries = chart.addSeries(lightweightCharts.HistogramSeries, {
+    color: '#94a3b8',
+    priceFormat: { type: 'volume' },
+    priceScaleId: '',
+  });
+  volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+  volumeSeries.setData(rows.map((row) => ({
+    time: formatKlineTime(row.date),
+    value: Number(row.volume),
+    color: Number(row.close) >= Number(row.open) ? 'rgba(200, 63, 73, 0.65)' : 'rgba(30, 142, 90, 0.65)',
+  })));
+
+  activeKlineChart = chart;
+  const resize = () => {
+    if (!activeKlineChart || !chartMount.isConnected) return;
+    chart.applyOptions({ width: chartMount.clientWidth || 900, height: chartMount.clientHeight || 520 });
+  };
+  if (window.ResizeObserver) {
+    activeKlineResizeObserver = new ResizeObserver(resize);
+    activeKlineResizeObserver.observe(chartMount);
+  }
+  chart.timeScale().fitContent();
+  window.requestAnimationFrame(resize);
+
+  const selectedDateText = state.selectedDate ? ` ｜ 選股日期 ${formatYmd(state.selectedDate)}` : '';
+  elements.klineModalTitle.textContent = `${payload.code} ${payload.name}｜TradingView K 線圖`;
+  elements.klineModalMeta.textContent = `${payload.market} ｜ TradingView Lightweight Charts 日線 ｜ ${formatYmd(payload.start_date)} ～ ${formatYmd(payload.end_date)} ｜ 共 ${payload.count} 根${selectedDateText}`;
+}
+
+async function openKlineModal(code, name, market) {
+  if (!code) return;
+  const requestId = ++klineRequestSerial;
+  const normalizedMarket = market || '';
+  openKlineModalShell(code, name || '', normalizedMarket);
+
   try {
     const query = new URLSearchParams({
-      end_date: state.selectedDate,
-      lookback_days: String(lookbackDays),
+      end_date: state.selectedDate || '',
+      lookback_days: String(KLINE_CHART_LOOKBACK_DAYS),
     });
     const response = await fetch(`/api/kline/${encodeURIComponent(code)}?${query.toString()}`);
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || '讀取 K 線資料失敗');
+      throw new Error(payload.error || '讀取長期 K 線資料失敗');
     }
-    setCachedKlineModalPayload(payload, state.selectedDate, lookbackDays);
-    if (state.currentKlineCode !== code) return;
-    renderKlineModal(payload);
+    if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
+    let lightweightCharts;
+    try {
+      lightweightCharts = await loadLightweightCharts();
+      if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
+    } catch (chartError) {
+      if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
+      renderLocalKlineFallback(payload);
+      return;
+    }
+    const symbol = buildTradingViewSymbol(code, normalizedMarket || payload.market);
+    if (!symbol) {
+      throw new Error('找不到股票的 TWSE / TPEX 市場資訊。');
+    }
+    renderTradingViewKline(payload, lightweightCharts, symbol);
   } catch (error) {
+    if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
     elements.klineModalBody.innerHTML = `<div class="empty-block">${escapeHtml(String(error.message || error))}</div>`;
-    elements.klineModalMeta.textContent = `截至 ${formatYmd(state.selectedDate)} ｜ 讀取失敗`;
+    elements.klineModalMeta.textContent = `TradingView K 線資料載入失敗 ｜ ${String(error.message || error)}`;
   }
 }
 
@@ -827,7 +1079,7 @@ function renderDateOptions() {
 
 function parseLimitUpOutput(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (!lines.some((line) => line.includes('策略：前一交易日漲停') || line.includes('策略：指定日期漲停'))) return null;
+  if (!lines.some((line) => line.includes('策略：前一交易日漲停') || line.includes('策略：指定日期漲停') || line.includes('策略：創高黑量縮'))) return null;
 
   const summary = {};
   const stocks = [];
@@ -835,7 +1087,7 @@ function parseLimitUpOutput(text) {
     if (line.startsWith('比較區間：')) summary.range = line.replace('比較區間：', '').trim();
     if (line.startsWith('參考前日：')) summary.referenceDate = line.replace('參考前日：', '').trim();
     if (line.startsWith('入選數量：')) summary.count = line.replace('入選數量：', '').trim();
-    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+張)(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+分數=([\d.]+))?(?:\s+\|\s+後5日=(.+))?$/);
+    const match = line.match(/^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+.+?C=([\d.]+)\s+V=([\d.]+張)(?:\s+\|\s+上影=([\d.]+)\s+實體=([\d.]+)\s+比=([\d.-]+))?(?:\s+MA4合計=[\d.]+)?(?:\s+分數=([\d.]+))?(?:\s+\|\s+後5日=(.+))?$/);
     if (match) {
       const futureText = (match[10] || '').trim();
       const futureDays = futureText === '(無後續資料)'
@@ -1433,20 +1685,29 @@ function buildSummaryChips(summary) {
 
 function renderLimitUp(parsed) {
   const enrichedStocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
-  const stocks = sortStocksByRankScore(enrichedStocks);
+  const rankedStocks = sortStocksByRankScore(enrichedStocks);
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
+  const isNewHighBlack = state.selectedKey === 'new_high_black_volume_contraction';
+  const stocks = isNewHighBlack && intradaySummary
+    ? rankedStocks.filter((stock) => intradayMap[stock.code]?.matched === true)
+    : rankedStocks;
   const showIntradayColumns = isIntradayFunction();
 
   if (!stocks.length) {
+    const emptyIntradayStatus = showIntradayColumns
+      ? (intradaySummary
+          ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
+          : (state.marketState?.market_open ? '尚未查詢' : '盤後停用'))
+      : '';
     elements.latestOutput.className = 'output-box rich-output';
     elements.latestOutput.innerHTML = `
       <div class="summary-grid">${buildSummaryChips({
         '比較區間': parsed.summary.range,
         '入選數量': parsed.summary.count,
-        '即時行情': showIntradayColumns ? (state.marketState?.market_open ? '尚未查詢' : '盤後停用') : '',
+        '即時行情': emptyIntradayStatus,
       })}</div>
-      <div class="empty-block">沒有可顯示的股票。</div>`;
+      <div class="empty-block">${isNewHighBlack && intradaySummary ? '目前盤中沒有符合「未再創高、量縮、股價不低於 MA5 的 -5%」的股票。' : '沒有可顯示的股票。'}</div>`;
     return;
   }
 
@@ -1455,7 +1716,9 @@ function renderLimitUp(parsed) {
   const totalColumns = (parsed.sector ? 1 : 0) + 6 + extraIntradayColumns + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
   const intradayStatus = showIntradayColumns
     ? (intradaySummary
-        ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
+        ? (isNewHighBlack
+            ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
+            : `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`)
         : (state.marketState?.market_open ? '尚未查詢' : '盤後停用'))
     : '';
 
@@ -1469,7 +1732,7 @@ function renderLimitUp(parsed) {
   if (parsed.sector) {
     html += '<th>族群</th>';
   }
-  html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
+  html += `<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">${isNewHighBlack ? '前日收盤' : '收盤'}</th><th style="text-align:right">${isNewHighBlack ? '前日量' : '成交量'}</th>`;
   if (showIntradayColumns) {
     html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
   }
@@ -2394,7 +2657,7 @@ async function init() {
   elements.latestOutput.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-stock-code]');
     if (!trigger) return;
-    openKlineModal(trigger.dataset.stockCode, trigger.dataset.stockName || '');
+    openKlineModal(trigger.dataset.stockCode, trigger.dataset.stockName || '', trigger.dataset.stockMarket || '');
   });
   elements.dateInput.addEventListener('change', async (event) => {
     const nextDate = fromInputDate(event.target.value);

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -52,6 +53,7 @@ UPDATE_TRACKED_PATHS = [
     "scripts/fetch_klines.py",
     "scripts/analyze_today_limitup_sector_groups.py",
     "scripts/screen_today_limitup.py",
+    "scripts/screen_new_high_black_volume_contraction.py",
     "scripts/screen_low_base_turnaround.py",
     "scripts/pre_breakout_screen.py",
     "scripts/pre_breakout_backtest.py",
@@ -99,6 +101,7 @@ OUTPUT_WATCH_DIRS = [
 PRE_BREAKOUT_FUNCTION_KEYS = {"pre_breakout_standard", "pre_breakout_conservative"}
 BACKTESTABLE_FUNCTION_KEYS = PRE_BREAKOUT_FUNCTION_KEYS
 INTRADAY_FUNCTION_KEYS = {
+    "new_high_black_volume_contraction",
     "low_base_turnaround",
     "pre_breakout_standard",
     "pre_breakout_conservative",
@@ -133,6 +136,26 @@ app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 
 
+@app.after_request
+def add_security_headers(response: Any) -> Any:
+    if request.path.endswith(".js") and response.mimetype == "text/plain":
+        response.mimetype = "application/javascript"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "font-src 'self' data:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
 @dataclass(frozen=True)
 class FunctionSpec:
     key: str
@@ -162,6 +185,13 @@ FUNCTIONS: list[FunctionSpec] = [
         name="今日漲停",
         category="訊號型功能",
         description="指定日期收盤漲停，且成交量大於 2000 張。",
+        executable=True,
+    ),
+    FunctionSpec(
+        key="new_high_black_volume_contraction",
+        name="創高黑量縮",
+        category="訊號型功能",
+        description="前一日創 30 日新高且上引收黑，盤中確認未再創高、量縮且股價不低於 MA5 的 -5%。",
         executable=True,
     ),
     FunctionSpec(
@@ -514,8 +544,8 @@ def parse_tpex_stock_row(row: list[Any], fields: list[str]) -> tuple[str, dict[s
         return None
 
 
-def find_stock_market(code: str, end_date: str) -> tuple[str, str] | None:
-    for current_date in reversed(get_date_window(end_date, lookback_days=60)):
+def find_stock_market(code: str, end_date: str, lookback_days: int = 60) -> tuple[str, str] | None:
+    for current_date in reversed(get_date_window(end_date, lookback_days=lookback_days)):
         twse_path = MILES_AGENT_ROOT / "data" / "twse" / "2026" / f"{current_date}.json"
         if twse_path.exists() and is_valid_twse_file(twse_path):
             payload = json.loads(twse_path.read_text(encoding="utf-8"))
@@ -538,7 +568,7 @@ def find_stock_market(code: str, end_date: str) -> tuple[str, str] | None:
 
 
 def build_kline_rows(code: str, end_date: str, lookback_days: int = 60) -> dict[str, Any]:
-    market_info = find_stock_market(code, end_date)
+    market_info = find_stock_market(code, end_date, lookback_days)
     if not market_info:
         raise RuntimeError(f"找不到股票代號 {code} 的市場資料。")
 
@@ -755,6 +785,15 @@ def build_commands(spec: FunctionSpec, target_date: str | None = None) -> list[l
             build_script_command(scripts_dir / "screen_today_limitup.py", "--date", latest_date, "--no-save"),
             build_script_command(scripts_dir / "analyze_today_limitup_sector_groups.py", "--date", latest_date, "--no-save"),
         ]
+    if spec.key == "new_high_black_volume_contraction":
+        return [
+            build_script_command(
+                scripts_dir / "screen_new_high_black_volume_contraction.py",
+                "--date",
+                latest_date,
+                "--no-save",
+            )
+        ]
     if spec.key == "ma_bullish_turning_point":
         return [
             build_script_command(scripts_dir / "screen_ma_alignment_turning_point.py", "--latest-date", latest_date, "--no-save"),
@@ -954,7 +993,12 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
 
     output_text = row["output_text"] or ""
     if (
-        function_key in {"limit_up_red_arrow", "today_limit_up", "ma_bullish_turning_point"}
+        function_key in {
+            "limit_up_red_arrow",
+            "today_limit_up",
+            "new_high_black_volume_contraction",
+            "ma_bullish_turning_point",
+        }
         and ("後5日=" not in output_text or "分數=" not in output_text)
     ):
         return None
@@ -993,6 +1037,7 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
     if (
         function_key in {
             "limit_up_red_arrow",
+            "new_high_black_volume_contraction",
             "ma_bullish_turning_point",
             "pre_breakout_standard",
             "pre_breakout_conservative",
@@ -1219,9 +1264,71 @@ def parse_ma_bullish_candidates(output_text: str) -> list[dict[str, str]]:
     return stocks
 
 
+def parse_new_high_black_candidates(output_text: str) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^(TWSE|TPEX)\s+(\d+)\s+(.+?)\s+\|\s+(\d{8})\s+"
+        r"O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+"
+        r"V=([\d.]+)張\s+MA4合計=([\d.]+)\s+分數=([\d.]+)\s+\|\s+後5日=(.+)$"
+    )
+    stocks: list[dict[str, str]] = []
+    for raw_line in output_text.splitlines():
+        match = pattern.match(raw_line.strip())
+        if not match:
+            continue
+        stocks.append(
+            {
+                "market": match.group(1),
+                "code": match.group(2),
+                "name": match.group(3),
+                "setup_date": match.group(4),
+                "close": match.group(8),
+                "volume": match.group(9),
+                "setup_high": match.group(6),
+                "setup_volume": match.group(9),
+                "ma4_close_sum": match.group(10),
+            }
+        )
+    return stocks
+
+
+def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str, Any]) -> dict[str, Any]:
+    last_price = float(quote.get("lastPrice") or quote.get("closePrice") or 0)
+    high_price = float(quote.get("highPrice") or 0)
+    raw_trade_volume = (quote.get("total") or {}).get("tradeVolume")
+    try:
+        trade_volume = float(raw_trade_volume)
+    except (TypeError, ValueError):
+        trade_volume = None
+    volume_available = trade_volume is not None and math.isfinite(trade_volume) and trade_volume >= 0
+    setup_high = float(candidate.get("setup_high") or 0)
+    setup_volume = float(candidate.get("setup_volume") or 0)
+    ma4_close_sum = float(candidate.get("ma4_close_sum") or 0)
+    ma5 = (ma4_close_sum + last_price) / 5 if last_price > 0 else 0
+    ma5_floor = ma5 * 0.95
+    matched = (
+        last_price > 0
+        and high_price > 0
+        and volume_available
+        and high_price <= setup_high
+        and trade_volume < setup_volume
+        and last_price >= ma5_floor
+    )
+    return {
+        "matched": matched,
+        "ma5": round(ma5, 4),
+        "ma5_floor": round(ma5_floor, 4),
+        "intraday_high": high_price,
+        "setup_high": setup_high,
+        "setup_volume": setup_volume,
+        "volume_available": volume_available,
+    }
+
+
 def parse_intraday_candidates(function_key: str, output_text: str) -> list[dict[str, str]]:
     if function_key in PRE_BREAKOUT_FUNCTION_KEYS:
         return parse_pre_breakout_candidates(output_text)
+    if function_key == "new_high_black_volume_contraction":
+        return parse_new_high_black_candidates(output_text)
     if function_key == "limit_up_red_arrow":
         return parse_limit_up_candidates(output_text)
     if function_key == "ma_bullish_turning_point":
@@ -1257,7 +1364,9 @@ def fetch_fugle_intraday_quote(symbol: str) -> dict[str, Any]:
 
 def build_intraday_payload(function_key: str, result_date: str, output_text: str) -> tuple[str, dict[str, Any], float]:
     if function_key not in INTRADAY_FUNCTION_KEYS:
-        raise RuntimeError("只有標準選股、保守選股、均線多頭新成形、漲停紅箭支援即時行情。")
+        raise RuntimeError("這個選股功能目前不支援即時行情。")
+    if function_key == "new_high_black_volume_contraction" and result_date != latest_valid_shared_date():
+        raise RuntimeError("創高黑量縮只能用最新完整交易日作為前一日條件，請切換到最新日期後再查詢。")
     if not is_intraday_market_open():
         raise RuntimeError("目前非盤中時段，即時行情功能暫不啟用。")
     if not get_secret_value("FUGLE_INTRADAY_API_KEY"):
@@ -1271,13 +1380,14 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
 
     quotes: dict[str, Any] = {}
     success_count = 0
+    matched_count = 0
     for stock in candidates:
         code = stock["code"]
         try:
             quote = fetch_fugle_intraday_quote(code)
             total = quote.get("total") or {}
             last_trade = quote.get("lastTrade") or {}
-            quotes[code] = {
+            quote_payload = {
                 "code": code,
                 "name": stock["name"],
                 "last_price": quote.get("lastPrice") or quote.get("closePrice"),
@@ -1286,6 +1396,12 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
                 "last_trade_time": last_trade.get("time") or total.get("time"),
                 "is_close": quote.get("isClose"),
             }
+            if function_key == "new_high_black_volume_contraction":
+                condition = evaluate_new_high_black_intraday(stock, quote)
+                quote_payload.update(condition)
+                if condition["matched"]:
+                    matched_count += 1
+            quotes[code] = quote_payload
             success_count += 1
         except Exception as exc:
             quotes[code] = {
@@ -1301,6 +1417,7 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
         "result_date": result_date,
         "count": len(candidates),
         "success_count": success_count,
+        "matched_count": matched_count if function_key == "new_high_black_volume_contraction" else success_count,
         "quotes": quotes,
         "started_at": started_at.isoformat(timespec="seconds"),
         "finished_at": finished_at.isoformat(timespec="seconds"),
@@ -2485,7 +2602,7 @@ def api_result() -> Any:
 @app.route("/api/kline/<stock_code>")
 def api_kline(stock_code: str) -> Any:
     end_date = request.args.get("end_date") or latest_valid_shared_date()
-    lookback_days = int(request.args.get("lookback_days") or 60)
+    lookback_days = min(max(int(request.args.get("lookback_days") or 1000), 1), 1000)
     try:
         payload = build_full_kline_payload(code=stock_code, end_date=end_date, lookback_days=lookback_days)
     except Exception as exc:
@@ -2698,7 +2815,7 @@ def api_institutional(function_key: str) -> Any:
 @app.route("/api/intraday/<function_key>", methods=["POST"])
 def api_intraday(function_key: str) -> Any:
     if function_key not in INTRADAY_FUNCTION_KEYS:
-        return jsonify({"error": "只有標準選股、保守選股、均線多頭新成形、漲停紅箭支援即時行情。"}), 400
+        return jsonify({"error": "這個選股功能目前不支援即時行情。"}), 400
 
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")

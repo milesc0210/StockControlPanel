@@ -1497,7 +1497,7 @@ input {
 
 .kline-modal-card {
   position: relative;
-  width: min(1180px, calc(100vw - 48px));
+  width: min(1320px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   border-radius: 28px;
@@ -1537,6 +1537,108 @@ input {
   color: var(--muted);
   background: #f7f9fd;
   border-radius: 18px;
+}
+
+.tradingview-chart-wrap {
+  min-height: 440px;
+  height: min(690px, calc(100vh - 190px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #dfe7f7;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.tradingview-kline-reading {
+  flex: 0 0 auto;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  box-sizing: border-box;
+  color: #334155;
+  background: #f7f9fd;
+  border-bottom: 1px solid #e6ecf7;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: auto;
+}
+
+.tradingview-kline-legend {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-height: 34px;
+  padding: 6px 14px;
+  color: #64748b;
+  background: #ffffff;
+  border-bottom: 1px solid #e6ecf7;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tradingview-kline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tradingview-kline-legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.tradingview-kline-legend-line.ma5 {
+  background: #1f77b4;
+}
+
+.tradingview-kline-legend-line.ma10 {
+  background: #ff7f0e;
+}
+
+.tradingview-kline-legend-line.ma20 {
+  background: #222222;
+}
+
+.tradingview-chart-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.tradingview-widget-container {
+  height: 100%;
+  width: 100%;
+}
+
+.tradingview-widget-container__widget {
+  height: calc(100% - 32px);
+  width: 100%;
+}
+
+.tradingview-widget-copyright {
+  height: 32px;
+  padding: 7px 12px 0;
+  box-sizing: border-box;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: right;
+}
+
+.tradingview-widget-copyright a {
+  color: #2962ff;
+  text-decoration: none;
+}
+
+.tradingview-widget-copyright a:hover {
+  text-decoration: underline;
 }
 
 .kline-summary-grid {
@@ -1648,5 +1750,14 @@ input {
   .date-input,
   .date-control-wrap {
     width: 100%;
+  }
+
+  .tradingview-chart-wrap {
+    min-height: 360px;
+    height: calc(100vh - 220px);
+  }
+
+  .tradingview-kline-reading {
+    font-size: 12px;
   }
 }
