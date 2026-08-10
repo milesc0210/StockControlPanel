@@ -245,6 +245,36 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         for forbidden in ("創高收黑日", "前日高點", "前日量", "訊號日", "訊號高點"):
             self.assertNotIn(forbidden, render_block)
 
+    def test_current_intraday_run_uses_latest_completed_setup_and_current_result_date(self):
+        base_run = {
+            "status": "success",
+            "output_text": "WATCH TWSE 2330 台積電 | 20260807 O=103.00 H=105.00 L=96.00 C=99.00 V=5000.000張 MA4合計=393.0000 分數=10.00 | 後5日=(無後續資料)",
+            "result_date": "20260807",
+        }
+        intraday = {
+            "started_at": "2026-08-10T09:01:00+08:00",
+            "finished_at": "2026-08-10T09:01:02+08:00",
+            "result_date": "20260807",
+        }
+        with patch.object(stock_app, "current_intraday_date", return_value="20260810"), \
+             patch.object(stock_app, "latest_valid_shared_date", return_value="20260807"), \
+             patch.object(stock_app, "run_function", return_value=base_run), \
+             patch.object(stock_app, "build_intraday_payload", return_value=("success", intraday, 2.0)):
+            result = stock_app.run_current_new_high_intraday(
+                stock_app.FUNCTION_MAP["new_high_black_volume_contraction"],
+                "20260810",
+            )
+
+        self.assertEqual(result["result_date"], "20260810")
+        self.assertEqual(result["intraday"]["payload"]["result_date"], "20260810")
+        self.assertEqual(result["intraday"]["payload"]["source_result_date"], "20260807")
+
+    def test_frontend_exposes_current_market_date_and_direct_intraday_run(self):
+        javascript = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("intraday_date", javascript)
+        self.assertIn("isCurrentIntradaySelection", javascript)
+        self.assertIn("/api/run/", javascript)
+
 
 if __name__ == "__main__":
     unittest.main()

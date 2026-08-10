@@ -1,6 +1,7 @@
 const state = {
   functions: [],
   dates: [],
+  intradayDate: '',
   selectedDate: localStorage.getItem('stock-control-date') || '',
   selectedKey: localStorage.getItem('stock-control-selected') || 'limit_up_red_arrow',
   selectedFunction: null,
@@ -11,6 +12,10 @@ const state = {
   backtestPresets: [],
   serenityResult: null,
   serenityProgressTimer: null,
+  serenitySelectedCodes: new Set(),
+  serenitySelectionKey: '',
+  serenitySelectionInitialized: false,
+  serenityAnalyzedCodes: new Set(),
   marketState: { market_open: false, now: '', timezone: 'Asia/Taipei' },
   selfUpdateProgressTimer: null,
   updateStatusChecked: false,
@@ -208,6 +213,18 @@ function isIntradayAvailable() {
   return isIntradayFunction() && Boolean(state.selectedDate) && Boolean(state.marketState?.market_open);
 }
 
+function isCurrentIntradaySelection() {
+  return state.selectedKey === 'new_high_black_volume_contraction'
+    && Boolean(state.intradayDate)
+    && state.selectedDate === state.intradayDate
+    && Boolean(state.marketState?.market_open);
+}
+
+function isSelectableDate(date) {
+  return state.dates.includes(date)
+    || (state.selectedKey === 'new_high_black_volume_contraction' && date === state.intradayDate);
+}
+
 function getInstitutionalMap() {
   return state.currentRun?.institutional?.payload?.stocks || {};
 }
@@ -263,6 +280,10 @@ function resetSerenityPanel(message = '按上方「Serenity 深度分析」，�
     state.serenityProgressTimer = null;
   }
   state.serenityResult = null;
+  state.serenityAnalyzedCodes = new Set();
+  state.serenitySelectedCodes = new Set();
+  state.serenitySelectionKey = '';
+  state.serenitySelectionInitialized = false;
   elements.serenityMeta.innerHTML = '';
   elements.serenityOutput.className = 'serenity-output empty-block';
   elements.serenityOutput.textContent = message;
@@ -271,6 +292,7 @@ function resetSerenityPanel(message = '按上方「Serenity 深度分析」，�
 
 function renderSerenityResult(payload) {
   state.serenityResult = payload;
+  state.serenityAnalyzedCodes = new Set((payload.stock_codes || []).map(String));
   elements.serenityPanel.hidden = false;
   elements.serenityMeta.innerHTML = '';
   const metaItems = [
@@ -328,6 +350,7 @@ function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
   const showSerenity = !isFearGreed && Boolean(state.selectedFunction?.executable);
   const serenityStocks = getCurrentSerenityStocks();
+  const selectedSerenityStocks = getSelectedSerenityStocks();
   const showInstitutional = !isFearGreed && isPreBreakoutFunction() && Boolean(state.selectedDate);
   const showIntraday = !isFearGreed && isIntradayFunction() && Boolean(state.selectedDate);
   const showBacktest = !isFearGreed && isBacktestFunction();
@@ -336,10 +359,13 @@ function renderActionButtons() {
   elements.refreshFutureButton.hidden = isFearGreed || !state.selectedFunction?.executable;
   elements.serenityButton.hidden = !showSerenity;
   elements.serenityPanel.hidden = !showSerenity;
-  elements.serenityButton.disabled = !serenityStocks.length;
-  elements.serenityButton.title = serenityStocks.length
-    ? `分析目前 ${serenityStocks.length} 檔候選股`
-    : '請先執行選股，產生候選股票後才能分析';
+  elements.serenityButton.textContent = selectedSerenityStocks.length
+    ? `Serenity 深度分析（${selectedSerenityStocks.length} 檔）`
+    : 'Serenity 深度分析';
+  elements.serenityButton.disabled = !selectedSerenityStocks.length;
+  elements.serenityButton.title = selectedSerenityStocks.length
+    ? `分析已勾選的 ${selectedSerenityStocks.length} 檔股票（共 ${serenityStocks.length} 檔）`
+    : serenityStocks.length ? '請至少勾選 1 檔股票再開始分析' : '請先執行選股，產生候選股票後才能分析';
   elements.institutionalButton.hidden = !showInstitutional;
   elements.intradayButton.hidden = !showIntraday;
   elements.intradayButton.disabled = !isIntradayAvailable();
@@ -521,6 +547,120 @@ function buildCodeButton(stock) {
 
 function buildInlineKlineSlot(stock) {
   return `<td class="td-mini-kline"><div class="mini-kline-slot" data-inline-kline="${escapeHtml(stock.code)}">載入中...</div></td>`;
+}
+
+function serenitySelectionKey() {
+  return `${state.selectedKey}::${state.selectedDate || ''}`;
+}
+
+function syncSerenitySelection(stocks) {
+  const codes = [...new Set((stocks || []).map((stock) => String(stock.code || '').trim()).filter(Boolean))];
+  if (!codes.length) return codes;
+  const key = serenitySelectionKey();
+  if (!state.serenitySelectionInitialized || state.serenitySelectionKey !== key) {
+    state.serenitySelectedCodes = new Set();
+    state.serenitySelectionKey = key;
+    state.serenitySelectionInitialized = true;
+  } else {
+    const available = new Set(codes);
+    state.serenitySelectedCodes = new Set(
+      [...state.serenitySelectedCodes].filter((code) => available.has(code)),
+    );
+  }
+  return codes;
+}
+
+function getSelectedSerenityStocks() {
+  const stocks = getCurrentSerenityStocks();
+  syncSerenitySelection(stocks);
+  return stocks.filter((stock) => state.serenitySelectedCodes.has(String(stock.code || '').trim()));
+}
+
+function sameStockCodeSet(left, right) {
+  const a = [...new Set((left || []).map(String))].sort();
+  const b = [...new Set(right || [])].sort();
+  return a.length === b.length && a.every((code, index) => code === b[index]);
+}
+
+function updateSerenitySelectionUI() {
+  const stocks = getCurrentSerenityStocks();
+  const selected = getSelectedSerenityStocks();
+  const selectedCount = selected.length;
+  elements.serenityButton.textContent = selectedCount
+    ? `Serenity 深度分析（${selectedCount} 檔）`
+    : 'Serenity 深度分析';
+  elements.serenityButton.disabled = !selectedCount;
+  elements.serenityButton.title = selectedCount
+    ? `分析已勾選的 ${selectedCount} 檔股票（共 ${stocks.length} 檔）`
+    : '請至少勾選 1 檔股票再開始分析';
+
+  const checkboxes = [...elements.latestOutput.querySelectorAll('input[data-serenity-stock]')];
+  for (const checkbox of checkboxes) {
+    checkbox.checked = state.serenitySelectedCodes.has(checkbox.dataset.serenityStock);
+  }
+  const selectAll = elements.latestOutput.querySelector('input[data-serenity-select-all]');
+  if (selectAll) {
+    selectAll.checked = Boolean(stocks.length) && selectedCount === stocks.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < stocks.length;
+  }
+}
+
+function installSerenitySelectionControls(stocks) {
+  syncSerenitySelection(stocks);
+  const table = elements.latestOutput.querySelector('table.stock-table');
+  if (!table) {
+    updateSerenitySelectionUI();
+    return;
+  }
+
+  const headerRow = table.querySelector('thead tr');
+  if (headerRow) {
+    const headerCell = document.createElement('th');
+    headerCell.className = 'th-serenity-select';
+    const selectAll = document.createElement('input');
+    selectAll.type = 'checkbox';
+    selectAll.dataset.serenitySelectAll = 'true';
+    selectAll.setAttribute('aria-label', '全選或取消全選 Serenity 深度分析股票');
+    selectAll.title = '全選或取消全選';
+    headerCell.appendChild(selectAll);
+    headerRow.insertBefore(headerCell, headerRow.firstChild);
+    selectAll.addEventListener('change', () => {
+      const codes = syncSerenitySelection(stocks);
+      state.serenitySelectedCodes = selectAll.checked ? new Set(codes) : new Set();
+      updateSerenitySelectionUI();
+    });
+  }
+
+  const stockRows = [...table.querySelectorAll('tbody tr')].filter(
+    (row) => !row.classList.contains('group-divider-row'),
+  );
+  stockRows.forEach((row, index) => {
+    const stock = stocks[index];
+    if (!stock?.code) return;
+    const cell = document.createElement('td');
+    cell.className = 'td-serenity-select';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.dataset.serenityStock = String(stock.code);
+    checkbox.setAttribute('aria-label', `選擇 ${stock.code} ${stock.name || ''} 進行 Serenity 深度分析`);
+    checkbox.checked = state.serenitySelectedCodes.has(String(stock.code));
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        state.serenitySelectedCodes.add(String(stock.code));
+      } else {
+        state.serenitySelectedCodes.delete(String(stock.code));
+      }
+      updateSerenitySelectionUI();
+    });
+    cell.appendChild(checkbox);
+    row.insertBefore(cell, row.firstChild);
+  });
+
+  for (const row of table.querySelectorAll('tbody tr.group-divider-row')) {
+    const firstCell = row.firstElementChild;
+    if (firstCell) firstCell.colSpan = Number(firstCell.colSpan || 1) + 1;
+  }
+  updateSerenitySelectionUI();
 }
 
 function renderMiniKlineSvg(rows) {
@@ -1067,7 +1207,9 @@ function renderGroups() {
 function renderDateOptions() {
   const hasDates = Boolean(state.dates.length);
   const earliest = hasDates ? state.dates[state.dates.length - 1] : '';
-  const latest = hasDates ? state.dates[0] : '';
+  const latest = state.selectedKey === 'new_high_black_volume_contraction' && state.intradayDate
+    ? state.intradayDate
+    : (hasDates ? state.dates[0] : '');
 
   elements.dateInput.value = state.selectedDate ? toInputDate(state.selectedDate) : '';
   elements.dateInput.min = earliest ? toInputDate(earliest) : '';
@@ -1075,7 +1217,9 @@ function renderDateOptions() {
   elements.dateInput.disabled = !hasDates;
 
   if (hasDates) {
-    elements.dateNote.textContent = `可選擇的日期：${toInputDate(earliest).replaceAll('-', '/')} 起的交易日`;
+    elements.dateNote.textContent = state.selectedKey === 'new_high_black_volume_contraction' && state.intradayDate
+      ? `可選擇的日期：${toInputDate(earliest).replaceAll('-', '/')} 起；目前盤中日期 ${toInputDate(state.intradayDate).replaceAll('-', '/')} 可直接選股`
+      : `可選擇的日期：${toInputDate(earliest).replaceAll('-', '/')} 起的交易日`;
   } else {
     elements.dateNote.textContent = '目前沒有可選日期';
   }
@@ -1734,10 +1878,16 @@ function renderNewHighBlack(parsed) {
   const intradayStatus = intradaySummary
     ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
     : (state.marketState?.market_open ? `尚未查詢（觀察 ${parsed.summary.watchCount || 0} 檔）` : '盤後顯示完成交易日結果');
+  const displayDate = state.currentRun?.current_intraday
+    ? state.currentRun.result_date
+    : parsed.summary.signalDate;
+  const displayCount = state.currentRun?.current_intraday
+    ? intradaySummary?.matched_count
+    : parsed.summary.count;
 
   let html = `<div class="summary-grid">${buildSummaryChips({
-    '交易日': parsed.summary.signalDate,
-    '入選數量': parsed.summary.count,
+    '交易日': displayDate,
+    '入選數量': displayCount,
     '即時行情': intradayStatus,
   })}</div>`;
 
@@ -1807,6 +1957,7 @@ function renderNewHighBlack(parsed) {
   html += '</tbody></table></div>';
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(stocks);
   hydrateInlineKlines(stocks);
 }
 
@@ -1918,6 +2069,7 @@ function renderLimitUp(parsed) {
 
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(stocks);
   hydrateInlineKlines(stocks);
 }
 
@@ -1987,6 +2139,7 @@ function renderLowBase(parsed) {
   html += '</tbody></table></div>';
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(stocks);
   hydrateInlineKlines(stocks);
 }
 
@@ -2082,6 +2235,7 @@ function renderPreBreakout(parsed) {
 
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(stocks);
   hydrateInlineKlines(stocks);
 }
 
@@ -2196,6 +2350,7 @@ function renderMaBullish(parsed) {
 
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(stocks);
   hydrateInlineKlines(stocks);
 }
 
@@ -2479,12 +2634,16 @@ async function runBacktest() {
 async function runSerenityAnalysis(forceRefresh = false) {
   forceRefresh = forceRefresh === true;
   if (!state.selectedFunction?.executable) return;
-  const stocks = getCurrentSerenityStocks();
+  const stocks = getSelectedSerenityStocks();
   if (!stocks.length) {
-    resetSerenityPanel('目前結果沒有可分析的候選股票，請先執行選股。');
-    setSerenityStatus('沒有候選股', 'failed');
+    resetSerenityPanel('請先在結果表勾選至少 1 檔股票，再執行 Serenity 深度分析。');
+    setSerenityStatus('沒有勾選股票', 'failed');
     return;
   }
+  const selectionChanged = !sameStockCodeSet(
+    stocks.map((stock) => stock.code),
+    state.serenityAnalyzedCodes,
+  );
 
   const progressSteps = [
     '整理候選股與族群...',
@@ -2512,7 +2671,8 @@ async function runSerenityAnalysis(forceRefresh = false) {
       body: JSON.stringify({
         result_date: state.selectedDate,
         stocks,
-        force_refresh: forceRefresh,
+        force_refresh: forceRefresh || selectionChanged,
+        stock_codes: stocks.map((stock) => stock.code),
       }),
     });
     const payload = await response.json();
@@ -2537,7 +2697,12 @@ async function runSerenityAnalysis(forceRefresh = false) {
 async function selectFunction(key) {
   state.selectedKey = key;
   localStorage.setItem('stock-control-selected', key);
+  if (key !== 'new_high_black_volume_contraction' && state.selectedDate === state.intradayDate) {
+    state.selectedDate = state.dates[0] || '';
+    if (state.selectedDate) localStorage.setItem('stock-control-date', state.selectedDate);
+  }
   state.selectedFunction = state.functions.find((item) => item.key === key) || null;
+  state.currentRun = null;
   resetSerenityPanel();
   renderGroups();
 
@@ -2574,6 +2739,8 @@ async function runSelectedFunction() {
     setStatus('執行失敗', 'failed');
     return;
   }
+
+  if (isCurrentIntradaySelection() && !(await ensureTokenConfigured('fugle'))) return;
 
   elements.runButton.disabled = true;
   setStatus('執行中', 'running');
@@ -2734,12 +2901,16 @@ async function init() {
   const datePayload = await datesResponse.json();
   state.marketState = marketStateResponse.ok ? await marketStateResponse.json() : state.marketState;
   state.dates = datePayload.dates || [];
+  state.intradayDate = datePayload.intraday_date || '';
   if (datePayload.sync_status?.fetched) {
     setStatus('已自動補抓最新資料', 'success');
   } else if (datePayload.sync_status?.status === 'failed') {
     setStatus('最新資料補抓失敗', 'failed');
   }
-  if (!state.selectedDate || !state.dates.includes(state.selectedDate)) {
+  if (state.intradayDate && state.selectedKey === 'new_high_black_volume_contraction') {
+    state.selectedDate = state.intradayDate;
+    localStorage.setItem('stock-control-date', state.selectedDate);
+  } else if (!state.selectedDate || !isSelectableDate(state.selectedDate)) {
     state.selectedDate = datePayload.latest_date || '';
     if (state.selectedDate) {
       localStorage.setItem('stock-control-date', state.selectedDate);
@@ -2794,7 +2965,7 @@ async function init() {
   });
   elements.dateInput.addEventListener('change', async (event) => {
     const nextDate = fromInputDate(event.target.value);
-    if (!state.dates.includes(nextDate)) {
+    if (!isSelectableDate(nextDate)) {
       event.target.value = state.selectedDate ? toInputDate(state.selectedDate) : '';
       setStatus('日期無效', 'failed');
       renderPlainOutput('主人，這天不是可用交易日。請從 2026/2 開始的交易日中選擇。', 'error-output');

@@ -1208,6 +1208,11 @@ def is_intraday_market_open(now: datetime | None = None) -> bool:
     return dt_time(9, 0) <= current_time <= dt_time(13, 30)
 
 
+def current_intraday_date(now: datetime | None = None) -> str | None:
+    current = now or taipei_now()
+    return current.strftime("%Y%m%d") if is_intraday_market_open(current) else None
+
+
 def parse_pre_breakout_candidates(output_text: str) -> list[dict[str, str]]:
     pattern = re.compile(r"^([ABC])\s+(\d+)\s+(\S+)\s+\|\s+C=([\d.]+)\s+V=(\d+)張(?:\s+分數=([\d.]+))?\s+\|\s+後5日=(.+)$")
     stocks: list[dict[str, str]] = []
@@ -1379,8 +1384,10 @@ def fetch_fugle_intraday_quote(symbol: str) -> dict[str, Any]:
 def build_intraday_payload(function_key: str, result_date: str, output_text: str) -> tuple[str, dict[str, Any], float]:
     if function_key not in INTRADAY_FUNCTION_KEYS:
         raise RuntimeError("這個選股功能目前不支援即時行情。")
-    if function_key == "new_high_black_volume_contraction" and result_date != latest_valid_shared_date():
-        raise RuntimeError("創高黑量縮只能用最新完整交易日作為前一日條件，請切換到最新日期後再查詢。")
+    if function_key == "new_high_black_volume_contraction":
+        latest_date = latest_valid_shared_date()
+        if result_date != latest_date and result_date != current_intraday_date():
+            raise RuntimeError("創高黑量縮只能用最新完整交易日或當日盤中日期查詢。")
     if not is_intraday_market_open():
         raise RuntimeError("目前非盤中時段，即時行情功能暫不啟用。")
     if not get_secret_value("FUGLE_INTRADAY_API_KEY"):
@@ -2463,6 +2470,56 @@ def run_function(spec: FunctionSpec, requested_date: str | None = None, skip_cac
     })
 
 
+def run_current_new_high_intraday(
+    spec: FunctionSpec,
+    current_date: str,
+    skip_cache: bool = False,
+) -> dict[str, Any]:
+    """盤中直接執行：以前一完整交易日的創高黑結果作為觀察名單，再查當日即時行情。"""
+    if spec.key != "new_high_black_volume_contraction":
+        raise RuntimeError("只有創高黑量縮支援當日盤中直接選股。")
+    if current_date != current_intraday_date():
+        raise RuntimeError("當日盤中直接選股只能在目前交易時段使用。")
+
+    started_at = taipei_now()
+    started_perf = time.perf_counter()
+    source_result_date = latest_valid_shared_date()
+    base_run = run_function(spec, requested_date=source_result_date, skip_cache=skip_cache)
+    if base_run.get("status") != "success":
+        base_run["result_date"] = current_date
+        return base_run
+
+    status, intraday_payload, intraday_duration = build_intraday_payload(
+        function_key=spec.key,
+        result_date=current_date,
+        output_text=base_run["output_text"],
+    )
+    intraday_payload["result_date"] = current_date
+    intraday_payload["source_result_date"] = source_result_date
+    finished_at = taipei_now()
+    result = dict(base_run)
+    result.update(
+        {
+            "status": status,
+            "result_date": current_date,
+            "started_at": started_at.isoformat(timespec="seconds"),
+            "finished_at": finished_at.isoformat(timespec="seconds"),
+            "duration_seconds": round(time.perf_counter() - started_perf, 3),
+            "from_cache": False,
+            "current_intraday": True,
+            "intraday": {
+                "status": status,
+                "payload": intraday_payload,
+                "source": "fugle_intraday_quote",
+                "started_at": intraday_payload["started_at"],
+                "finished_at": intraday_payload["finished_at"],
+                "duration_seconds": intraday_duration,
+            },
+        }
+    )
+    return result
+
+
 @app.route("/")
 def index() -> str:
     return render_template("index.html")
@@ -2491,7 +2548,12 @@ def api_dates() -> Any:
     sync_status = ensure_latest_market_data()
     dates = sorted(valid_shared_dates(), reverse=True)
     latest_date = dates[0] if dates else None
-    return jsonify({"dates": dates, "latest_date": latest_date, "sync_status": sync_status})
+    return jsonify({
+        "dates": dates,
+        "latest_date": latest_date,
+        "intraday_date": current_intraday_date(),
+        "sync_status": sync_status,
+    })
 
 
 @app.route("/api/market_state")
@@ -2570,15 +2632,17 @@ def api_serenity(function_key: str) -> Any:
     if not re.fullmatch(r"\d{8}", result_date):
         return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
 
-    force_refresh = payload.get("force_refresh") is True
-    if not force_refresh:
-        cached = lookup_serenity_cache(function_key, result_date)
-        if cached is not None:
-            return jsonify(cached)
-
     stocks = normalize_serenity_stocks(payload.get("stocks"))
     if not stocks:
         return jsonify({"ok": False, "error": "目前結果沒有可供 Serenity 分析的股票清單。"}), 400
+
+    force_refresh = payload.get("force_refresh") is True
+    requested_codes = [stock["code"] for stock in stocks]
+    if not force_refresh:
+        cached = lookup_serenity_cache(function_key, result_date)
+        cached_codes = cached.get("stock_codes") if cached else None
+        if cached is not None and cached_codes == requested_codes:
+            return jsonify(cached)
 
     prompt = build_serenity_prompt(spec.name, result_date, stocks)
     started = time.perf_counter()
@@ -2593,6 +2657,7 @@ def api_serenity(function_key: str) -> Any:
         "function_name": spec.name,
         "result_date": result_date,
         "stock_count": len(stocks),
+        "stock_codes": [stock["code"] for stock in stocks],
         "analysis": analysis,
         "duration_seconds": round(time.perf_counter() - started, 3),
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -2659,6 +2724,8 @@ def api_run(function_key: str) -> Any:
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
     try:
+        if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
+            return jsonify(run_current_new_high_intraday(spec, result_date))
         return jsonify(run_function(spec, requested_date=result_date))
     except Exception as exc:
         app.logger.exception("選股功能執行失敗: %s", function_key)
@@ -2675,7 +2742,13 @@ def api_refresh_future(function_key: str) -> Any:
         return jsonify({"error": "這個項目不可執行。"}), 400
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
-    return jsonify(run_function(spec, requested_date=result_date, skip_cache=True))
+    try:
+        if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
+            return jsonify(run_current_new_high_intraday(spec, result_date, skip_cache=True))
+        return jsonify(run_function(spec, requested_date=result_date, skip_cache=True))
+    except Exception as exc:
+        app.logger.exception("強制重跑失敗: %s", function_key)
+        return jsonify({"error": f"強制重跑失敗：{exc}"}), 500
 
 
 @app.route("/api/backtest-presets", methods=["GET", "POST"])
@@ -2840,7 +2913,10 @@ def api_intraday(function_key: str) -> Any:
     if not is_intraday_market_open():
         return jsonify({"error": "目前非盤中時段，即時行情功能暫不啟用。"}), 400
 
-    cached_run = lookup_cache(function_key, result_date)
+    source_result_date = result_date
+    if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
+        source_result_date = latest_valid_shared_date()
+    cached_run = lookup_cache(function_key, source_result_date)
     if cached_run is None:
         return jsonify({"error": "請先執行選股功能，再查即時行情。"}), 400
 
