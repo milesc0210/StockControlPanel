@@ -1876,6 +1876,12 @@ function renderNewHighBlack(parsed) {
     : [];
   const showingLive = Boolean(intradaySummary);
   const stocks = showingLive ? liveStocks : sortStocksByRankScore(parsed.stocks);
+  const quoteDateLabel = intradaySummary?.quote_date
+    ? `${formatYmd(intradaySummary.quote_date)}股價`
+    : '即時價';
+  const quoteVolumeLabel = intradaySummary?.quote_date
+    ? `${formatYmd(intradaySummary.quote_date)}量`
+    : '即時量';
   const intradayStatus = intradaySummary
     ? (currentIntradayRun
         ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
@@ -1906,7 +1912,7 @@ function renderNewHighBlack(parsed) {
   const maxFutureDays = showingLive ? 0 : Math.max(...stocks.map((stock) => stock.futureDays.length));
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
   if (showingLive) {
-    html += '<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">即時價</th><th style="text-align:right">即時量</th><th style="text-align:right">MA5</th><th>狀態</th>';
+    html += `<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">${escapeHtml(quoteDateLabel)}</th><th style="text-align:right">${escapeHtml(quoteVolumeLabel)}</th><th style="text-align:right">MA5</th><th>狀態</th>`;
   } else {
     html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">MA5</th>';
     if (maxFutureDays > 0) {

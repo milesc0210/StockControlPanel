@@ -214,6 +214,7 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
 
         self.assertIn("matched_count", payload)
         self.assertEqual(payload["matched_count"], 1)
+        self.assertIn("quote_date", payload)
         self.assertTrue(payload["quotes"]["2330"]["matched"])
         self.assertFalse(payload["quotes"]["2317"]["matched"])
 
@@ -234,6 +235,8 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertIn("function renderNewHighBlack", javascript)
         self.assertIn("Object.values(intradayMap).filter", javascript)
         self.assertIn("currentIntradayRun", javascript)
+        self.assertIn("quoteDateLabel", javascript)
+        self.assertIn("股價", javascript)
         self.assertIn("intradaySummary.matched_count", javascript)
 
     def test_frontend_new_high_table_uses_standard_columns_and_future_closes(self):

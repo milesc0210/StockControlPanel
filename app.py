@@ -1474,6 +1474,7 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
         "quotes": quotes,
         "started_at": started_at.isoformat(timespec="seconds"),
         "finished_at": finished_at.isoformat(timespec="seconds"),
+        "quote_date": finished_at.strftime("%Y%m%d"),
         "market_open": True,
     }
     status = "success" if success_count > 0 else "failed"
