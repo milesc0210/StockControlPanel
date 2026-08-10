@@ -1909,15 +1909,15 @@ function renderNewHighBlack(parsed) {
     return;
   }
 
-  const maxFutureDays = showingLive ? 0 : Math.max(...stocks.map((stock) => stock.futureDays.length));
+  const maxFutureDays = showingLive ? 0 : Math.min(5, Math.max(...stocks.map((stock) => stock.futureDays.length)));
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
   if (showingLive) {
     html += `<th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">${escapeHtml(quoteDateLabel)}</th><th style="text-align:right">${escapeHtml(quoteVolumeLabel)}</th><th style="text-align:right">MA5</th><th>狀態</th>`;
   } else {
     html += '<th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">MA5</th>';
     if (maxFutureDays > 0) {
-      const headerStock = stocks.find((stock) => stock.futureDays.length === maxFutureDays);
-      for (const day of (headerStock?.futureDays || [])) {
+      const headerStock = stocks.find((stock) => stock.futureDays.length >= maxFutureDays);
+      for (const day of (headerStock?.futureDays || []).slice(0, maxFutureDays)) {
         html += `<th style="text-align:center">${escapeHtml(formatYmd(day.date).slice(5))}</th>`;
       }
       html += '<th style="text-align:center">合計%</th>';
@@ -1932,7 +1932,11 @@ function renderNewHighBlack(parsed) {
       html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
       html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
       html += buildInlineKlineSlot(stock);
-      html += `<td class="td-number">${formatPrice(stock.last_price)}</td>`;
+      const intradayTone = toneClassFromNumber(stock.change_percent);
+      const intradayPriceCellClass = stock.error ? 'td-future td-empty' : `td-future td-intraday ${intradayTone}`;
+      const intradayPrice = stock.error ? '—' : formatPrice(stock.last_price);
+      const intradayChange = stock.error ? '' : formatChangePercent(stock.change_percent);
+      html += `<td class="${intradayPriceCellClass}"><strong>${intradayPrice}</strong>${stock.error ? '' : `<span class="${intradayTone}">${escapeHtml(intradayChange)}</span>`}</td>`;
       html += `<td class="td-number">${formatVolume(stock.trade_volume)}</td>`;
       html += `<td class="td-number">${formatPrice(stock.ma5)}</td>`;
       const liveStatusClass = stock.error ? 'failed' : (stock.matched ? 'success' : 'running');
@@ -1956,7 +1960,7 @@ function renderNewHighBlack(parsed) {
           const prevCls = day.pctFromPrev.startsWith('+') ? 'up-text' : day.pctFromPrev.startsWith('-') ? 'down-text' : '';
           html += `<td class="td-future"><strong>${escapeHtml(day.close)}</strong><span class="${prevCls}">${escapeHtml(day.pctFromPrev)}</span></td>`;
         }
-        const lastDay = stock.futureDays[stock.futureDays.length - 1];
+        const lastDay = stock.futureDays[Math.min(stock.futureDays.length, maxFutureDays) - 1];
         html += lastDay
           ? `<td class="td-future td-total"><span class="${lastDay.pctFromSignal.startsWith('+') ? 'up-text' : lastDay.pctFromSignal.startsWith('-') ? 'down-text' : ''}">${escapeHtml(lastDay.pctFromSignal)}</span></td>`
           : '<td class="td-future td-empty">—</td>';
