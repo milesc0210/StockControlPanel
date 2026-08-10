@@ -235,6 +235,23 @@ function getIntradayMap() {
 
 function getCurrentSerenityStocks() {
   if (!state.currentRun || state.currentRun.status !== 'success') return [];
+  const intradayPayload = state.currentRun.intraday?.payload;
+  const intradayQuotes = intradayPayload?.quotes || {};
+  if (intradayPayload && Object.keys(intradayQuotes).length) {
+    const liveQuotes = Object.values(intradayQuotes).filter((quote) => (
+      state.currentRun.current_intraday ? quote?.matched === true : Boolean(quote)
+    ));
+    return liveQuotes.slice(0, 30).map((quote) => ({
+      code: quote.code || '',
+      name: quote.name || '',
+      market: quote.market || '',
+      theme: '',
+      grade: '',
+      rank_score: '',
+      close: quote.last_price ?? '',
+      volume: quote.trade_volume ?? '',
+    })).filter((stock) => stock.code);
+  }
   const text = state.currentRun.output_text || '';
   let parsed = parseNewHighBlackOutput(text);
   let stocks = parsed?.stocks || [];
