@@ -1302,6 +1302,36 @@ def parse_new_high_black_candidates(output_text: str) -> list[dict[str, str]]:
     return stocks
 
 
+def parse_new_high_black_result_candidates(output_text: str) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^RESULT\s+(TWSE|TPEX)\s+([0-9A-Z]+)\s+(.+?)\s+\|\s+SETUP\s+(\d{8})\s+"
+        r"O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+V=([\d.]+)張\s+\|\s+"
+        r"SIGNAL\s+(\d{8})\s+O=([\d.]+)\s+H=([\d.]+)\s+L=([\d.]+)\s+C=([\d.]+)\s+"
+        r"V=([\d.]+)張\s+MA5=([\d.]+)\s+分數=([\d.]+)\s+\|\s+後5日=(.+)$"
+    )
+    stocks: list[dict[str, str]] = []
+    for raw_line in output_text.splitlines():
+        match = pattern.match(raw_line.strip())
+        if not match:
+            continue
+        signal_close = float(match.group(14))
+        ma5 = float(match.group(16))
+        stocks.append(
+            {
+                "market": match.group(1),
+                "code": match.group(2),
+                "name": match.group(3),
+                "setup_date": match.group(4),
+                "close": match.group(14),
+                "volume": match.group(15),
+                "setup_high": match.group(6),
+                "setup_volume": match.group(9),
+                "ma4_close_sum": f"{ma5 * 5 - signal_close:.4f}",
+            }
+        )
+    return stocks
+
+
 def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str, Any]) -> dict[str, Any]:
     def finite_quote_number(value: Any, *, allow_zero: bool = False) -> float | None:
         if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -1343,11 +1373,11 @@ def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str,
     }
 
 
-def parse_intraday_candidates(function_key: str, output_text: str) -> list[dict[str, str]]:
+def parse_intraday_candidates(function_key: str, output_text: str, *, use_watchlist: bool = False) -> list[dict[str, str]]:
     if function_key in PRE_BREAKOUT_FUNCTION_KEYS:
         return parse_pre_breakout_candidates(output_text)
     if function_key == "new_high_black_volume_contraction":
-        return parse_new_high_black_candidates(output_text)
+        return parse_new_high_black_candidates(output_text) if use_watchlist else parse_new_high_black_result_candidates(output_text)
     if function_key == "limit_up_red_arrow":
         return parse_limit_up_candidates(output_text)
     if function_key == "ma_bullish_turning_point":
@@ -1395,7 +1425,8 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
 
     started_at = taipei_now()
     started_perf = time.perf_counter()
-    candidates = parse_intraday_candidates(function_key, output_text)
+    use_watchlist = function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date()
+    candidates = parse_intraday_candidates(function_key, output_text, use_watchlist=use_watchlist)
     if not candidates:
         raise RuntimeError("目前結果沒有可查詢的股票清單。")
 

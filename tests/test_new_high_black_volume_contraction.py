@@ -202,6 +202,7 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
             return {"lastPrice": 190, "highPrice": 206, "changePercent": -1.0, "total": {"tradeVolume": 3000}}
 
         with patch.object(stock_app, "is_intraday_market_open", return_value=True), \
+             patch.object(stock_app, "current_intraday_date", return_value="20260730"), \
              patch.object(stock_app, "latest_valid_shared_date", return_value="20260730"), \
              patch.object(stock_app, "get_secret_value", return_value="token"), \
              patch.object(stock_app, "fetch_fugle_intraday_quote", side_effect=fake_quote):
@@ -231,7 +232,8 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertIn("策略：創高黑量縮", javascript)
         self.assertIn("function parseNewHighBlackOutput", javascript)
         self.assertIn("function renderNewHighBlack", javascript)
-        self.assertIn("Object.values(intradayMap).filter((quote) => quote?.matched === true)", javascript)
+        self.assertIn("Object.values(intradayMap).filter", javascript)
+        self.assertIn("currentIntradayRun", javascript)
         self.assertIn("intradaySummary.matched_count", javascript)
 
     def test_frontend_new_high_table_uses_standard_columns_and_future_closes(self):
@@ -274,6 +276,26 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertIn("intraday_date", javascript)
         self.assertIn("isCurrentIntradaySelection", javascript)
         self.assertIn("/api/run/", javascript)
+
+    def test_historical_intraday_uses_result_rows_while_current_run_uses_watch_rows(self):
+        output = "\n".join(
+            [
+                "策略：創高黑量縮",
+                "入選數量：1",
+                "RESULT TWSE 2330 台積電 | SETUP 20260806 O=103.00 H=105.00 L=96.00 C=99.00 V=5000.000張 | SIGNAL 20260807 O=100.00 H=101.00 L=98.00 C=99.00 V=4000.000張 MA5=98.00 分數=10.00 | 後5日=(無後續資料)",
+                "WATCH TWSE 2317 鴻海 | 20260807 O=260.00 H=270.00 L=250.00 C=265.00 V=8000.000張 MA4合計=1000.0000 分數=9.00 | 後5日=(無後續資料)",
+            ]
+        )
+        result_candidates = stock_app.parse_intraday_candidates(
+            "new_high_black_volume_contraction", output, use_watchlist=False,
+        )
+        watch_candidates = stock_app.parse_intraday_candidates(
+            "new_high_black_volume_contraction", output, use_watchlist=True,
+        )
+        self.assertEqual([item["code"] for item in result_candidates], ["2330"])
+        self.assertEqual(result_candidates[0]["setup_volume"], "5000.000")
+        self.assertEqual(result_candidates[0]["ma4_close_sum"], "391.0000")
+        self.assertEqual([item["code"] for item in watch_candidates], ["2317"])
 
 
 if __name__ == "__main__":

@@ -1870,13 +1870,16 @@ function buildSummaryChips(summary) {
 function renderNewHighBlack(parsed) {
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
+  const currentIntradayRun = Boolean(state.currentRun?.current_intraday);
   const liveStocks = intradaySummary
-    ? Object.values(intradayMap).filter((quote) => quote?.matched === true)
+    ? Object.values(intradayMap).filter((quote) => currentIntradayRun ? quote?.matched === true : quote)
     : [];
   const showingLive = Boolean(intradaySummary);
   const stocks = showingLive ? liveStocks : sortStocksByRankScore(parsed.stocks);
   const intradayStatus = intradaySummary
-    ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
+    ? (currentIntradayRun
+        ? `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`
+        : `${intradaySummary.success_count}/${intradaySummary.count} 檔已更新｜${compactTimestamp(intradaySummary.finished_at)}`)
     : (state.marketState?.market_open ? `尚未查詢（觀察 ${parsed.summary.watchCount || 0} 檔）` : '盤後顯示完成交易日結果');
   const displayDate = state.currentRun?.current_intraday
     ? state.currentRun.result_date
@@ -1926,7 +1929,9 @@ function renderNewHighBlack(parsed) {
       html += `<td class="td-number">${formatPrice(stock.last_price)}</td>`;
       html += `<td class="td-number">${formatVolume(stock.trade_volume)}</td>`;
       html += `<td class="td-number">${formatPrice(stock.ma5)}</td>`;
-      html += '<td><span class="status-pill success">盤中符合</span></td>';
+      const liveStatusClass = stock.error ? 'failed' : (stock.matched ? 'success' : 'running');
+      const liveStatusText = stock.error ? '行情失敗' : (stock.matched ? '盤中符合' : '盤中未符合');
+      html += `<td><span class="status-pill ${liveStatusClass}">${liveStatusText}</span></td>`;
     } else {
       html += `<td class="td-number td-score">${escapeHtml(stock.rankScore)}</td>`;
       html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
