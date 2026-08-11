@@ -56,6 +56,7 @@ UPDATE_TRACKED_PATHS = [
     "scripts/screen_new_high_black_volume_contraction.py",
     "scripts/screen_low_base_turnaround.py",
     "scripts/pre_breakout_screen.py",
+    "scripts/analyze_pre_breakout_sector_groups.py",
     "scripts/pre_breakout_backtest.py",
     "scripts/twse_tpex_fetch.py",
 ]
@@ -446,12 +447,17 @@ def ensure_latest_market_data() -> dict[str, Any]:
         for missing_date in missing_dates:
             command = build_script_command(SCRIPTS_DIR / "twse_tpex_fetch.py", missing_date)
             commands.append(command)
+            child_env = os.environ.copy()
+            child_env.setdefault("PYTHONUTF8", "1")
+            child_env.setdefault("PYTHONIOENCODING", "utf-8")
             result = subprocess.run(
                 command,
                 cwd=MILES_AGENT_ROOT,
                 capture_output=True,
                 text=True,
-                env=os.environ.copy(),
+                encoding="utf-8",
+                errors="replace",
+                env=child_env,
             )
             output = (result.stdout or result.stderr or "").strip()
             date_is_valid = missing_date in set(valid_shared_dates())
@@ -804,7 +810,11 @@ def build_commands(spec: FunctionSpec, target_date: str | None = None) -> list[l
         return [build_script_command(scripts_dir / "screen_low_base_turnaround.py", "--date", latest_date, "--no-save")]
     if spec.key == "pre_breakout_standard":
         pre_breakout_script = resolve_pre_breakout_script()
-        return [build_script_command(pre_breakout_script, "--date", latest_date, "--relaxed")]
+        sector_script = scripts_dir / "analyze_pre_breakout_sector_groups.py"
+        return [
+            build_script_command(pre_breakout_script, "--date", latest_date, "--relaxed"),
+            build_script_command(sector_script, "--date", latest_date, "--relaxed", "--no-save"),
+        ]
     if spec.key == "pre_breakout_conservative":
         pre_breakout_script = resolve_pre_breakout_script()
         return [build_script_command(pre_breakout_script, "--date", latest_date)]
@@ -1037,6 +1047,8 @@ def lookup_cache(function_key: str, result_date: str) -> dict[str, Any] | None:
     if function_key in {"pre_breakout_standard", "pre_breakout_conservative"} and "後5日=" not in output_text:
         return None
     if function_key in {"pre_breakout_standard", "pre_breakout_conservative"} and "漲幅口徑：市場口徑=對前日（前收） | 研究口徑=對訊號日" not in output_text:
+        return None
+    if function_key == "pre_breakout_standard" and "策略：標準選股 快速族群分析" not in output_text:
         return None
 
     latest_date = latest_valid_shared_date()

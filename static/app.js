@@ -1413,7 +1413,7 @@ function parsePreBreakoutOutput(text) {
       });
     }
   }
-  return { type: 'pre_breakout', summary, stocks };
+  return { type: 'pre_breakout', summary, stocks, sector: parseSectorQuickOutput(text) };
 }
 
 function parseMaBullishOutput(text) {
@@ -1459,7 +1459,7 @@ function parseMaBullishOutput(text) {
 
 function parseSectorQuickOutput(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (!lines.some((line) => line.includes('策略：0121 快速族群分析') || line.includes('策略：今日漲停 快速族群分析'))) return null;
+  if (!lines.some((line) => line.includes('策略：0121 快速族群分析') || line.includes('策略：今日漲停 快速族群分析') || line.includes('策略：標準選股 快速族群分析'))) return null;
 
   const result = {
     firstTierText: '',
@@ -1995,7 +1995,7 @@ function renderNewHighBlack(parsed) {
 
 function renderLimitUp(parsed) {
   const enrichedStocks = enrichMaBullishStocks(parsed.stocks, parsed.sector);
-  const rankedStocks = sortStocksByRankScore(enrichedStocks);
+  const rankedStocks = parsed.sector ? enrichedStocks : sortStocksByRankScore(enrichedStocks);
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
   const isNewHighBlack = state.selectedKey === 'new_high_black_volume_contraction';
@@ -2055,8 +2055,15 @@ function renderLimitUp(parsed) {
   }
   html += '</tr></thead><tbody>';
 
+  let currentTheme = null;
   for (const stock of stocks) {
     const intraday = intradayMap[stock.code] || {};
+    if (parsed.sector && stock.themeName && stock.themeName !== currentTheme) {
+      currentTheme = stock.themeName;
+      const themeMeta = parsed.sector.themeRows.find((row) => row.themeName === stock.themeName);
+      const themeLabel = themeMeta ? `${themeMeta.themeName}｜${themeMeta.count} 檔` : stock.themeName;
+      html += `<tr class="group-divider-row"><td colspan="${totalColumns}"><div class="group-divider-label">${escapeHtml(themeLabel)}</div></td></tr>`;
+    }
     html += '<tr>';
     if (parsed.sector) {
       html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
@@ -2098,6 +2105,17 @@ function renderLimitUp(parsed) {
   }
 
   html += '</tbody></table></div>';
+
+  if (parsed.sector) {
+    html += '<div class="sector-brief-card">';
+    html += '<h3>族群快速分類摘要</h3>';
+    html += '<ul class="sector-brief-list">';
+    if (parsed.sector.firstTierText) html += `<li><strong>第一梯隊：</strong>${escapeHtml(parsed.sector.firstTierText)}</li>`;
+    if (parsed.sector.secondTierText) html += `<li><strong>次主軸：</strong>${escapeHtml(parsed.sector.secondTierText)}</li>`;
+    if (parsed.sector.distributionText) html += `<li><strong>族群分布：</strong>${escapeHtml(parsed.sector.distributionText)}</li>`;
+    if (parsed.sector.singletonText) html += `<li><strong>單兵：</strong>${escapeHtml(parsed.sector.singletonText)}</li>`;
+    html += '</ul></div>';
+  }
 
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
@@ -2176,7 +2194,7 @@ function renderLowBase(parsed) {
 }
 
 function renderPreBreakout(parsed) {
-  const stocks = parsed.stocks;
+  const stocks = parsed.sector ? enrichMaBullishStocks(parsed.stocks, parsed.sector) : parsed.stocks;
   const institutionalMap = getInstitutionalMap();
   const institutionalSummary = state.currentRun?.institutional?.payload;
   const intradayMap = getIntradayMap();
@@ -2192,6 +2210,7 @@ function renderPreBreakout(parsed) {
   }
 
   const maxFutureDays = Math.max(...stocks.map((s) => s.futureDays.length));
+  const totalColumns = (parsed.sector ? 1 : 0) + 8 + (showIntradayColumns ? 2 : 0) + (maxFutureDays > 0 ? maxFutureDays + 1 : 0);
   const intradayStatus = showIntradayColumns
     ? (intradaySummary
         ? `${intradaySummary.success_count}/${intradaySummary.count}｜${compactTimestamp(intradaySummary.finished_at)}`
@@ -2206,6 +2225,7 @@ function renderPreBreakout(parsed) {
     '即時行情': intradayStatus,
   })}</div>`;
   html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  if (parsed.sector) html += '<th>族群</th>';
   html += '<th>等級</th><th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th class="th-name" style="text-align:left">名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
   if (showIntradayColumns) {
     html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
@@ -2220,11 +2240,21 @@ function renderPreBreakout(parsed) {
   }
   html += '</tr></thead><tbody>';
 
+  let currentTheme = null;
   for (const stock of stocks) {
     const tone = gradeTone(stock.grade);
     const inst = institutionalMap[stock.code] || {};
     const intraday = intradayMap[stock.code] || {};
+    if (parsed.sector && stock.themeName && stock.themeName !== currentTheme) {
+      currentTheme = stock.themeName;
+      const themeMeta = parsed.sector.themeRows.find((row) => row.themeName === stock.themeName);
+      const themeLabel = themeMeta ? `${themeMeta.themeName}｜${themeMeta.count} 檔` : stock.themeName;
+      html += `<tr class="group-divider-row"><td colspan="${totalColumns}"><div class="group-divider-label">${escapeHtml(themeLabel)}</div></td></tr>`;
+    }
     html += '<tr>';
+    if (parsed.sector) {
+      html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
+    }
     html += `<td class="td-grade"><span class="grade-pill ${tone}">${escapeHtml(stock.grade)}</span></td>`;
     html += `<td class="td-number td-score">${escapeHtml(stock.rankScore || '—')}</td>`;
     html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
@@ -2264,6 +2294,17 @@ function renderPreBreakout(parsed) {
   }
 
   html += '</tbody></table></div>';
+
+  if (parsed.sector) {
+    html += '<div class="sector-brief-card">';
+    html += '<h3>族群快速分類摘要</h3>';
+    html += '<ul class="sector-brief-list">';
+    if (parsed.sector.firstTierText) html += `<li><strong>第一梯隊：</strong>${escapeHtml(parsed.sector.firstTierText)}</li>`;
+    if (parsed.sector.secondTierText) html += `<li><strong>次主軸：</strong>${escapeHtml(parsed.sector.secondTierText)}</li>`;
+    if (parsed.sector.distributionText) html += `<li><strong>族群分布：</strong>${escapeHtml(parsed.sector.distributionText)}</li>`;
+    if (parsed.sector.singletonText) html += `<li><strong>單兵：</strong>${escapeHtml(parsed.sector.singletonText)}</li>`;
+    html += '</ul></div>';
+  }
 
   elements.latestOutput.className = 'output-box rich-output';
   elements.latestOutput.innerHTML = html;
@@ -2729,7 +2770,10 @@ async function runSerenityAnalysis(forceRefresh = false) {
 async function selectFunction(key) {
   state.selectedKey = key;
   localStorage.setItem('stock-control-selected', key);
-  if (key !== 'new_high_black_volume_contraction' && state.selectedDate === state.intradayDate) {
+  if (key === 'new_high_black_volume_contraction' && state.intradayDate) {
+    state.selectedDate = state.intradayDate;
+    localStorage.setItem('stock-control-date', state.selectedDate);
+  } else if (key !== 'new_high_black_volume_contraction' && state.selectedDate === state.intradayDate) {
     state.selectedDate = state.dates[0] || '';
     if (state.selectedDate) localStorage.setItem('stock-control-date', state.selectedDate);
   }
@@ -2923,38 +2967,64 @@ async function runIntraday() {
   }
 }
 
+async function loadDatesInBackground() {
+  try {
+    const response = await fetch('/api/dates');
+    const datePayload = await response.json();
+    if (!response.ok) {
+      throw new Error(datePayload.error || '讀取交易日失敗');
+    }
+    state.dates = datePayload.dates || [];
+    state.intradayDate = datePayload.intraday_date || '';
+    if (datePayload.sync_status?.fetched) {
+      setStatus('已自動補抓最新資料', 'success');
+    } else if (datePayload.sync_status?.status === 'failed') {
+      setStatus('最新資料補抓失敗', 'failed');
+    } else {
+      setStatus('交易日資料已載入', 'success');
+    }
+    if (state.intradayDate && state.selectedKey === 'new_high_black_volume_contraction') {
+      state.selectedDate = state.intradayDate;
+      localStorage.setItem('stock-control-date', state.selectedDate);
+    } else if (!state.selectedDate || !isSelectableDate(state.selectedDate)) {
+      state.selectedDate = datePayload.latest_date || '';
+      if (state.selectedDate) {
+        localStorage.setItem('stock-control-date', state.selectedDate);
+      }
+    }
+    renderDateOptions();
+    renderActionButtons();
+    syncBacktestInputsFromDates();
+    await selectFunction(state.selectedKey);
+  } catch (error) {
+    setStatus('交易日載入失敗', 'failed');
+    renderPlainOutput(`交易日資料載入失敗：${String(error.message || error)}`, 'error-output');
+  }
+}
+
 async function init() {
-  const [functionsResponse, datesResponse, marketStateResponse] = await Promise.all([
+  const [functionsResponse, marketStateResponse] = await Promise.all([
     fetch('/api/functions'),
-    fetch('/api/dates'),
     fetch('/api/market_state'),
   ]);
+  if (!functionsResponse.ok) {
+    throw new Error('讀取選股功能失敗');
+  }
   state.functions = await functionsResponse.json();
-  const datePayload = await datesResponse.json();
   state.marketState = marketStateResponse.ok ? await marketStateResponse.json() : state.marketState;
-  state.dates = datePayload.dates || [];
-  state.intradayDate = datePayload.intraday_date || '';
-  if (datePayload.sync_status?.fetched) {
-    setStatus('已自動補抓最新資料', 'success');
-  } else if (datePayload.sync_status?.status === 'failed') {
-    setStatus('最新資料補抓失敗', 'failed');
-  }
-  if (state.intradayDate && state.selectedKey === 'new_high_black_volume_contraction') {
-    state.selectedDate = state.intradayDate;
-    localStorage.setItem('stock-control-date', state.selectedDate);
-  } else if (!state.selectedDate || !isSelectableDate(state.selectedDate)) {
-    state.selectedDate = datePayload.latest_date || '';
-    if (state.selectedDate) {
-      localStorage.setItem('stock-control-date', state.selectedDate);
-    }
-  }
   if (!state.functions.find((item) => item.key === state.selectedKey)) {
     state.selectedKey = state.functions[0]?.key || '';
   }
+  state.selectedFunction = state.functions.find((item) => item.key === state.selectedKey) || null;
 
+  renderGroups();
+  if (state.selectedFunction) {
+    elements.title.textContent = state.selectedFunction.name;
+    elements.description.textContent = state.selectedFunction.description;
+  }
   renderDateOptions();
   renderActionButtons();
-  syncBacktestInputsFromDates();
+  setStatus('載入交易日資料中...', 'running');
   checkUpdateStatus();
   loadBacktestPresets().catch((error) => setBacktestStatus(String(error.message || error), 'failed'));
 
@@ -3009,7 +3079,7 @@ async function init() {
     await loadCurrentResult();
   });
 
-  await selectFunction(state.selectedKey);
+  await loadDatesInBackground();
 }
 
 init();

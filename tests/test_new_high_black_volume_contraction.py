@@ -241,6 +241,7 @@ class NewHighBlackVolumeContractionIntegrationTests(unittest.TestCase):
         self.assertIn("intradaySummary.matched_count", javascript)
         self.assertIn("state.currentRun.intraday?.payload", javascript)
         self.assertIn("quote?.matched === true", javascript)
+        self.assertIn("key === 'new_high_black_volume_contraction' && state.intradayDate", javascript)
 
     def test_frontend_new_high_table_uses_standard_columns_and_future_closes(self):
         javascript = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
