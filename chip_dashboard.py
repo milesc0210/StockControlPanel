@@ -1035,7 +1035,20 @@ def search_stocks(db_path: Path, query: str, limit: int = 10) -> dict[str, Any]:
     }
 
 
-def stock_payload(db_path: Path, code: str) -> dict[str, Any]:
+def stock_payload(
+    db_path: Path,
+    code: str,
+    *,
+    forced_groups_path: Path | None = None,
+) -> dict[str, Any]:
+    groups_path = forced_groups_path or db_path.parent / "FORCED_SECTOR_GROUPS.md"
+    _, forced_group_by_code = load_forced_sector_groups(groups_path)
+    forced_group = forced_group_by_code.get(str(code))
+    comparison_codes = [
+        member_code
+        for member_code, group_name in forced_group_by_code.items()
+        if group_name == forced_group
+    ]
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         init_schema(conn)
@@ -1051,18 +1064,25 @@ def stock_payload(db_path: Path, code: str) -> dict[str, Any]:
             (code,),
         ).fetchall()
         data_date = str(history[0]["data_date"]) if history else None
-        current = _serialize_metric(history[0]) if history else None
-        industry_rows: list[sqlite3.Row] = []
-        if data_date:
-            industry_rows = conn.execute(
-                """
+        current = (
+            _serialize_metric(history[0], forced_group_by_code=forced_group_by_code)
+            if history
+            else None
+        )
+        comparison_rows: list[sqlite3.Row] = []
+        if data_date and comparison_codes:
+            placeholders = ",".join("?" for _ in comparison_codes)
+            comparison_rows = conn.execute(
+                f"""
                 SELECT m.*, s.name, s.market, s.industry_name
                 FROM chip_weekly_metrics m JOIN chip_stocks s ON s.code=m.code
-                WHERE m.data_date=? AND s.industry_name=? AND m.change_rate IS NOT NULL
-                ORDER BY m.change_rate DESC, m.code LIMIT 20
+                WHERE m.data_date=? AND m.code IN ({placeholders})
+                ORDER BY CASE WHEN m.change_rate IS NULL THEN 1 ELSE 0 END,
+                         m.change_rate DESC, m.code
                 """,
-                (data_date, stock["industry_name"]),
+                (data_date, *comparison_codes),
             ).fetchall()
+        stock_group = forced_group or "未分類"
         institutional = conn.execute(
             "SELECT * FROM chip_institutional_daily WHERE code=? ORDER BY trade_date DESC LIMIT 10",
             (code,),
@@ -1073,12 +1093,19 @@ def stock_payload(db_path: Path, code: str) -> dict[str, Any]:
             "code": stock["code"],
             "name": stock["name"],
             "market": stock["market"],
-            "industry": stock["industry_name"] or "未分類",
+            "industry": stock_group,
         },
         "summary": current,
-        "history": [_serialize_metric(row) for row in reversed(history)],
+        "history": [
+            _serialize_metric(row, forced_group_by_code=forced_group_by_code)
+            for row in reversed(history)
+        ],
         "institutional": [dict(row) for row in reversed(institutional)],
-        "industry_comparison": [_serialize_metric(row) for row in industry_rows],
+        "industry_comparison": [
+            _serialize_metric(row, forced_group_by_code=forced_group_by_code)
+            for row in comparison_rows
+        ],
+        "grouping_source": groups_path.name,
         "history_complete": len(history) >= 9,
     }
 

@@ -3240,7 +3240,13 @@ def api_chip_stock(stock_code: str) -> Any:
         if chip_stock_history_count(stock_code) < 9:
             schedule_chip_stock_history(stock_code)
         schedule_chip_institutional_snapshot()
-        return jsonify(chip_dashboard.stock_payload(DB_PATH, stock_code))
+        return jsonify(
+            chip_dashboard.stock_payload(
+                DB_PATH,
+                stock_code,
+                forced_groups_path=BASE_DIR / "FORCED_SECTOR_GROUPS.md",
+            )
+        )
     except LookupError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 404
     except Exception as exc:

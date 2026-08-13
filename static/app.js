@@ -2828,7 +2828,7 @@ function renderChipStockAnalysis(payload) {
       <article><h4>近 9 週籌碼變化</h4><div class="chip-history-chart">${history.map((item) => { const value = Number(item.change_rate); const height = Number.isFinite(value) ? Math.max(3, Math.abs(value) / maxHistory * 100) : 3; return `<div class="chip-history-column"><span class="${toneClassFromNumber(value)}">${formatSignedPercent(value)}</span><i class="${value > 0 ? 'up' : value < 0 ? 'down' : 'flat'}" style="height:${height.toFixed(1)}%"></i><small>${formatYmd(item.data_date).slice(5)}</small></div>`; }).join('')}</div>${payload.history_complete ? '' : '<p class="chip-data-note">歷史資料尚未滿 9 週，畫面顯示目前可取得的週數。</p>'}</article>
       <article><h4>三大法人近期明細</h4>${institutional.length ? `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計／占量比</th></tr></thead><tbody>${institutional.map((row) => `<tr><td>${formatYmd(row.trade_date)}</td><td>${Number(row.foreign_lots).toLocaleString('zh-TW')}</td><td>${Number(row.investment_trust_lots).toLocaleString('zh-TW')}</td><td>${Number(row.dealer_lots).toLocaleString('zh-TW')}</td><td class="${toneClassFromNumber(row.total_lots)}">${Number(row.total_lots).toLocaleString('zh-TW')} 張／${formatSignedPercent(row.volume_ratio)}</td></tr>`).join('')}</tbody></table></div>` : chipEmpty('法人每日快照尚未匯入；不以其他口徑資料替代。')}</article>
     </div>
-    <article><h4>同族群股票籌碼比較</h4>${renderChipRankingRows(peers, '族群比較需要至少兩週有效集保資料。')}</article>`;
+    <article><h4>同族群股票籌碼比較</h4>${renderChipRankingRows(peers, '族群比較需要至少兩週有效集保資料。', '族群')}</article>`;
   mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

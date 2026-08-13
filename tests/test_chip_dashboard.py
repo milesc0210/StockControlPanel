@@ -411,6 +411,64 @@ class ChipDashboardApiTests(unittest.TestCase):
             self.assertEqual(item["industry"], "記憶體")
             self.assertEqual(payload["grouping_source"], "FORCED_SECTOR_GROUPS.md")
 
+    def test_stock_detail_comparison_uses_only_forced_optical_members(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            db_path = root / "chips.db"
+            forced_groups_path = root / "FORCED_SECTOR_GROUPS.md"
+            forced_groups_path.write_text(
+                "# 強制族群清單\n\n### 光學\n"
+                "- 3362 先進光\n"
+                "- 3406 玉晶光\n"
+                "- 3441 聯一光電\n"
+                "- 3504 揚明光\n"
+                "- 4976 佳凌\n",
+                encoding="utf-8",
+            )
+            optical_codes = ["3362", "3406", "3441", "3504", "4976"]
+            outsider_codes = ["3000", "3001"]
+            with closing(sqlite3.connect(db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                chip_dashboard.init_schema(conn)
+                chip_dashboard.upsert_stock_master(conn, [
+                    {
+                        "code": code,
+                        "name": code,
+                        "market": "TWSE",
+                        "industry_name": "光電業",
+                    }
+                    for code in optical_codes + outsider_codes
+                ])
+                rows = []
+                for code in optical_codes + outsider_codes:
+                    dates = (
+                        (("20260807", 1_100_000),)
+                        if code in {"3362", "3441"}
+                        else (("20260731", 1_000_000), ("20260807", 1_100_000))
+                    )
+                    for data_date, shares in dates:
+                        rows.extend([
+                            {"資料日期": data_date, "證券代號": code, "持股分級": "12", "股數": str(shares), "人數": "1", "占集保庫存數比例%": "10"},
+                            {"資料日期": data_date, "證券代號": code, "持股分級": "17", "股數": "10000000", "人數": "2", "占集保庫存數比例%": "100"},
+                        ])
+                chip_dashboard.import_tdcc_rows(conn, rows)
+                chip_dashboard.recompute_metrics(conn)
+                conn.commit()
+
+            payload = chip_dashboard.stock_payload(
+                db_path,
+                "3504",
+                forced_groups_path=forced_groups_path,
+            )
+
+            self.assertEqual(payload["stock"]["industry"], "光學")
+            self.assertEqual(payload["grouping_source"], "FORCED_SECTOR_GROUPS.md")
+            self.assertEqual(
+                {item["code"] for item in payload["industry_comparison"]},
+                set(optical_codes),
+            )
+            self.assertTrue(all(item["industry"] == "光學" for item in payload["industry_comparison"]))
+
     def test_chip_dashboard_function_is_registered_as_display_only(self):
         spec = stock_app.FUNCTION_MAP["chip_dashboard"]
         self.assertEqual(spec.name, "台股籌碼分析儀表板")
@@ -444,13 +502,18 @@ class ChipDashboardApiTests(unittest.TestCase):
              patch.object(stock_app, "schedule_chip_institutional_snapshot") as institutional_schedule, \
              patch.object(stock_app, "chip_stock_history_count", return_value=2), \
              patch.object(stock_app, "schedule_chip_stock_history") as schedule, \
-             patch.object(stock_app.chip_dashboard, "stock_payload", return_value=expected):
+             patch.object(stock_app.chip_dashboard, "stock_payload", return_value=expected) as stock_payload:
             response = stock_app.app.test_client().get("/api/chips/stocks/6488")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), expected)
         schedule.assert_called_once_with("6488")
         institutional_schedule.assert_called_once_with()
+        stock_payload.assert_called_once_with(
+            stock_app.DB_PATH,
+            "6488",
+            forced_groups_path=stock_app.BASE_DIR / "FORCED_SECTOR_GROUPS.md",
+        )
 
 
 class ChipDashboardFrontendContractTests(unittest.TestCase):
@@ -475,6 +538,7 @@ class ChipDashboardFrontendContractTests(unittest.TestCase):
         self.assertIn("FORCED_SECTOR_GROUPS.md", self.build_script)
         self.assertIn("依 FORCED_SECTOR_GROUPS.md", self.template)
         self.assertIn("renderChipRankingRows(rankings.increase, noRankingMessage, '族群')", self.javascript)
+        self.assertIn("renderChipRankingRows(peers, '族群比較需要至少兩週有效集保資料。', '族群')", self.javascript)
 
     def test_mobile_layout_and_non_color_signs_are_part_of_the_contract(self):
         self.assertIn("@media (max-width: 720px)", self.stylesheet)
