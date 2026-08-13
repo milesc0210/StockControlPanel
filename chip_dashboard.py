@@ -260,8 +260,15 @@ def fetch_stock_master(session: requests.Session | None = None) -> list[dict[str
         industry_response = http.get(industry_url, timeout=60)
         industry_response.raise_for_status()
         industry_lookup = {
-            str(_row_value(row, "公司代號") or "").strip(): str(
-                _row_value(row, "產業別") or "未分類"
+            str(
+                _row_value(row, "公司代號", "SecuritiesCompanyCode") or ""
+            ).strip(): str(
+                _row_value(
+                    row,
+                    "產業別",
+                    "SecuritiesIndustryName",
+                    "IndustryName",
+                ) or "未分類"
             ).strip()
             for row in industry_response.json()
         }
@@ -663,17 +670,22 @@ def _twse_institutional_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _tpex_institutional_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    rows = ((payload.get("tables") or [{}])[0]).get("data", [])
+    table = (payload.get("tables") or [{}])[0]
+    fields = [str(value).replace(" ", "").strip() for value in table.get("fields", [])]
+    expected_fields = ["代號", "名稱"] + ["買進股數", "賣出股數", "買賣超股數"] * 7 + ["三大法人買賣超股數合計"]
+    if fields != expected_fields:
+        return []
+    rows = table.get("data", [])
     return [
         {
             "code": str(row[0]).strip(),
-            "foreign_lots": _number(row[4]) / 1000.0,
-            "investment_trust_lots": _number(row[7]) / 1000.0,
+            "foreign_lots": _number(row[10]) / 1000.0,
+            "investment_trust_lots": _number(row[13]) / 1000.0,
             "dealer_lots": _number(row[22]) / 1000.0,
-            "total_lots": _number(row[24]) / 1000.0,
+            "total_lots": _number(row[23]) / 1000.0,
         }
         for row in rows
-        if len(row) >= 25
+        if len(row) == 24 and _ordinary_stock_code(str(row[0]).strip())
     ]
 
 

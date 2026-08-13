@@ -41,7 +41,10 @@ class ChipMetricTests(unittest.TestCase):
                         "CompanyAbbreviation": "茂生農經",
                         "SecuritiesIndustryCode": "33",
                     }])
-                return FakeResponse([{"公司代號": "1240", "產業別": "農業科技"}])
+                return FakeResponse([{
+                    "SecuritiesCompanyCode": "1240",
+                    "SecuritiesIndustryName": "農業科技",
+                }])
 
         rows = chip_dashboard.fetch_stock_master(FakeSession())
 
@@ -52,6 +55,34 @@ class ChipMetricTests(unittest.TestCase):
             "industry_code": "33",
             "industry_name": "農業科技",
         }])
+
+    def test_tpex_institutional_rows_follow_verified_official_group_order(self):
+        fields = ["代號", "名稱"] + ["買進股數", "賣出股數", "買賣超股數"] * 7 + ["三大法人買賣超股數合計"]
+        row = [
+            "6488", "環球晶",
+            "100,000", "40,000", "60,000",
+            "20,000", "10,000", "10,000",
+            "120,000", "50,000", "70,000",
+            "30,000", "5,000", "25,000",
+            "8,000", "3,000", "5,000",
+            "9,000", "4,000", "5,000",
+            "17,000", "7,000", "10,000",
+            "105,000",
+        ]
+
+        parsed = chip_dashboard._tpex_institutional_rows({"tables": [{"fields": fields, "data": [row]}]})
+
+        self.assertEqual(parsed, [{
+            "code": "6488",
+            "foreign_lots": 70.0,
+            "investment_trust_lots": 25.0,
+            "dealer_lots": 10.0,
+            "total_lots": 105.0,
+        }])
+
+    def test_tpex_institutional_rows_fail_closed_when_schema_changes(self):
+        payload = {"tables": [{"fields": ["代號", "名稱", "未知欄位"], "data": [["6488", "環球晶", "1"]]}]}
+        self.assertEqual(chip_dashboard._tpex_institutional_rows(payload), [])
 
     def test_400_lot_threshold_uses_levels_12_to_15_and_total_level_17(self):
         rows = [
