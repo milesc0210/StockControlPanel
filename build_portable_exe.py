@@ -15,6 +15,7 @@ APP_NAME = "StockControlPanel"
 DATA_ENTRIES = [
     (PROJECT_ROOT / "app.py", "."),
     (PROJECT_ROOT / "chip_dashboard.py", "."),
+    (PROJECT_ROOT / "FORCED_SECTOR_GROUPS.md", "."),
     (PROJECT_ROOT / "README.md", "."),
     (PROJECT_ROOT / "requirements.txt", "."),
     (PROJECT_ROOT / ".env.example", "."),

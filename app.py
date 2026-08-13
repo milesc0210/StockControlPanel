@@ -50,6 +50,7 @@ UPDATE_TRACKED_PATHS = [
     "chip_dashboard.py",
     "requirements.txt",
     "README.md",
+    "FORCED_SECTOR_GROUPS.md",
     "RELEASING.md",
     "build_portable_exe.py",
     "stock_control_panel_boot.py",
@@ -3250,7 +3251,12 @@ def api_chip_stock(stock_code: str) -> Any:
 def api_chip_industries() -> Any:
     try:
         ensure_chip_dashboard_snapshot()
-        return jsonify(chip_dashboard.industries_payload(DB_PATH))
+        return jsonify(
+            chip_dashboard.industries_payload(
+                DB_PATH,
+                forced_groups_path=BASE_DIR / "FORCED_SECTOR_GROUPS.md",
+            )
+        )
     except Exception as exc:
         return jsonify({"ok": False, "error": f"族群排名載入失敗：{exc}"}), 500
 
@@ -3259,7 +3265,12 @@ def api_chip_industries() -> Any:
 def api_chip_featured() -> Any:
     try:
         ensure_chip_dashboard_snapshot()
-        return jsonify(chip_dashboard.featured_payload(DB_PATH))
+        return jsonify(
+            chip_dashboard.featured_payload(
+                DB_PATH,
+                forced_groups_path=BASE_DIR / "FORCED_SECTOR_GROUPS.md",
+            )
+        )
     except Exception as exc:
         return jsonify({"ok": False, "error": f"熱門股票載入失敗：{exc}"}), 500
 

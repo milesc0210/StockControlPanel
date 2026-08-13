@@ -36,6 +36,51 @@ DEFAULT_HEADERS = {
 }
 
 
+def load_forced_sector_groups(path: Path) -> tuple[dict[str, list[str]], dict[str, str]]:
+    if not path.exists():
+        return {}, {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return {}, {}
+    groups: dict[str, list[str]] = {}
+    current_group = ""
+    safety_codes: list[str] = []
+    in_safety_section = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## 安全監控例外"):
+            current_group = "安全監控"
+            in_safety_section = True
+            groups.setdefault(current_group, [])
+            continue
+        if line.startswith("## "):
+            current_group = ""
+            in_safety_section = False
+            continue
+        if line.startswith("### "):
+            current_group = re.sub(r"（.*?）", "", line[4:]).strip()
+            in_safety_section = current_group == "安全監控"
+            groups.setdefault(current_group, [])
+            continue
+        if not current_group or not line.startswith("-"):
+            continue
+        for code in re.findall(r"(?<!\d)(\d{4})(?!\d)", line):
+            if code not in groups[current_group]:
+                groups[current_group].append(code)
+            if in_safety_section and code not in safety_codes:
+                safety_codes.append(code)
+    code_to_group: dict[str, str] = {}
+    for group_name, codes in groups.items():
+        if group_name == "安全監控":
+            continue
+        for code in codes:
+            code_to_group.setdefault(code, group_name)
+    for code in safety_codes:
+        code_to_group[code] = "安全監控"
+    return groups, code_to_group
+
+
 def _number(value: Any, default: float = 0.0) -> float:
     text = str(value or "").replace(",", "").replace("+", "").strip()
     if not text or text in {"--", "---", "－"}:
@@ -1017,16 +1062,23 @@ def stock_payload(db_path: Path, code: str) -> dict[str, Any]:
     }
 
 
-def industries_payload(db_path: Path, limit: int = 20) -> dict[str, Any]:
+def industries_payload(
+    db_path: Path,
+    limit: int = 20,
+    *,
+    forced_groups_path: Path | None = None,
+) -> dict[str, Any]:
+    groups_path = forced_groups_path or db_path.parent / "FORCED_SECTOR_GROUPS.md"
+    _, code_to_group = load_forced_sector_groups(groups_path)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         init_schema(conn)
         data_date = latest_complete_market_date(conn)
         if not data_date:
-            return {**_meta(None), "items": []}
+            return {**_meta(None), "grouping_source": groups_path.name, "items": []}
         rows = conn.execute(
             """
-            SELECT s.industry_name, m.change_rate, m.consecutive_increase, m.code, s.name
+            SELECT m.change_rate, m.consecutive_increase, m.code, s.name
             FROM chip_weekly_metrics m JOIN chip_stocks s ON s.code=m.code
             WHERE m.data_date=? AND m.change_rate IS NOT NULL AND s.active=1
             """,
@@ -1034,10 +1086,12 @@ def industries_payload(db_path: Path, limit: int = 20) -> dict[str, Any]:
         ).fetchall()
     groups: dict[str, list[sqlite3.Row]] = defaultdict(list)
     for row in rows:
-        groups[str(row["industry_name"] or "未分類")].append(row)
+        group_name = code_to_group.get(str(row["code"]))
+        if group_name:
+            groups[group_name].append(row)
     raw: dict[str, dict[str, Any]] = {}
     for industry, members in groups.items():
-        if len(members) < 5 or industry == "未分類":
+        if len(members) < 2:
             continue
         rates = [float(row["change_rate"]) for row in members]
         raw[industry] = {
@@ -1067,16 +1121,32 @@ def industries_payload(db_path: Path, limit: int = 20) -> dict[str, Any]:
     items.sort(key=lambda item: (-item["score"], item["industry"]))
     for index, item in enumerate(items, 1):
         item["rank"] = index
-    return {**_meta(data_date), "items": items[:limit]}
+    return {
+        **_meta(data_date),
+        "grouping_source": groups_path.name,
+        "items": items[:limit],
+    }
 
 
-def featured_payload(db_path: Path, limit: int = 12) -> dict[str, Any]:
+def featured_payload(
+    db_path: Path,
+    limit: int = 12,
+    *,
+    forced_groups_path: Path | None = None,
+) -> dict[str, Any]:
+    groups_path = forced_groups_path or db_path.parent / "FORCED_SECTOR_GROUPS.md"
+    _, code_to_group = load_forced_sector_groups(groups_path)
     rankings = rankings_payload(db_path, limit=30)
-    industries = industries_payload(db_path, limit=5)
-    candidates: list[dict[str, Any]] = list(rankings.get("increase", [])[:10])
+    industries = industries_payload(db_path, limit=5, forced_groups_path=groups_path)
+    forced_increase = [
+        {**row, "industry": code_to_group[row["code"]]}
+        for row in rankings.get("increase", [])
+        if row.get("code") in code_to_group
+    ]
+    candidates: list[dict[str, Any]] = list(forced_increase[:10])
     leader_codes = {item["leader"]["code"] for item in industries.get("items", []) if item.get("leader")}
-    candidates.extend(row for row in rankings.get("increase", []) if row["code"] in leader_codes)
-    candidates.extend(row for row in rankings.get("increase", []) if row.get("consecutive_increase", 0) >= 2)
+    candidates.extend(row for row in forced_increase if row["code"] in leader_codes)
+    candidates.extend(row for row in forced_increase if row.get("consecutive_increase", 0) >= 2)
     unique: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in candidates:
@@ -1086,4 +1156,8 @@ def featured_payload(db_path: Path, limit: int = 12) -> dict[str, Any]:
         unique.append(item)
         if len(unique) >= limit:
             break
-    return {**_meta(rankings.get("data_date")), "items": unique}
+    return {
+        **_meta(rankings.get("data_date")),
+        "grouping_source": groups_path.name,
+        "items": unique,
+    }

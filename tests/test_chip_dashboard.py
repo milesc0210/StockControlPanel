@@ -15,6 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ChipMetricTests(unittest.TestCase):
+    def test_forced_sector_document_uses_first_group_and_safety_override(self):
+        groups, code_to_group = chip_dashboard.load_forced_sector_groups(ROOT / "FORCED_SECTOR_GROUPS.md")
+
+        self.assertEqual(code_to_group["1605"], "電纜")
+        self.assertEqual(code_to_group["5484"], "安全監控")
+        self.assertEqual(code_to_group["6488"], "矽晶圓")
+        self.assertIn("記憶體", groups)
+
     def test_tpex_english_company_fields_are_parsed_into_stock_master(self):
         class FakeResponse:
             def __init__(self, payload):
@@ -179,7 +187,15 @@ class ChipDashboardApiTests(unittest.TestCase):
 
     def test_industries_ignore_a_newer_single_stock_history_week(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "chips.db"
+            root = Path(temp_dir)
+            db_path = root / "chips.db"
+            forced_groups_path = root / "FORCED_SECTOR_GROUPS.md"
+            forced_groups_path.write_text(
+                "# 強制族群清單\n\n### 測試族群\n- "
+                + "、".join(f"{1000 + index}" for index in range(500))
+                + "\n",
+                encoding="utf-8",
+            )
             with closing(sqlite3.connect(db_path)) as conn:
                 conn.row_factory = sqlite3.Row
                 chip_dashboard.init_schema(conn)
@@ -203,10 +219,35 @@ class ChipDashboardApiTests(unittest.TestCase):
                 chip_dashboard.recompute_metrics(conn)
                 conn.commit()
 
-            payload = chip_dashboard.industries_payload(db_path)
+            payload = chip_dashboard.industries_payload(db_path, forced_groups_path=forced_groups_path)
 
             self.assertEqual(payload["data_date"], "20260807")
             self.assertTrue(payload["items"])
+            self.assertEqual(payload["items"][0]["industry"], "測試族群")
+
+    def test_featured_cards_only_use_forced_sector_memberships(self):
+        rankings = {
+            "data_date": "20260807",
+            "increase": [
+                {"code": "6488", "name": "環球晶", "industry": "半導體業", "change_rate": 8.0, "consecutive_increase": 2},
+                {"code": "2330", "name": "台積電", "industry": "半導體業", "change_rate": 7.0, "consecutive_increase": 2},
+            ],
+        }
+        industries = {
+            "items": [{"industry": "矽晶圓", "leader": {"code": "6488", "name": "環球晶"}}],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            forced_groups_path = Path(temp_dir) / "FORCED_SECTOR_GROUPS.md"
+            forced_groups_path.write_text("# 強制族群清單\n\n### 矽晶圓\n- 6488 環球晶\n", encoding="utf-8")
+            with patch.object(chip_dashboard, "rankings_payload", return_value=rankings), \
+                 patch.object(chip_dashboard, "industries_payload", return_value=industries):
+                payload = chip_dashboard.featured_payload(
+                    Path(temp_dir) / "chips.db",
+                    forced_groups_path=forced_groups_path,
+                )
+
+        self.assertEqual([item["code"] for item in payload["items"]], ["6488"])
+        self.assertEqual(payload["items"][0]["industry"], "矽晶圓")
 
     def test_dashboard_snapshot_requires_stock_master_and_two_market_weeks(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -391,6 +432,8 @@ class ChipDashboardFrontendContractTests(unittest.TestCase):
         self.assertIn("台股籌碼分析儀表板", self.template)
         self.assertIn("comparison_stock_count", self.javascript)
         self.assertIn("有效比較母體", self.javascript)
+        self.assertIn("FORCED_SECTOR_GROUPS.md", self.build_script)
+        self.assertIn("依 FORCED_SECTOR_GROUPS.md", self.template)
 
     def test_mobile_layout_and_non_color_signs_are_part_of_the_contract(self):
         self.assertIn("@media (max-width: 720px)", self.stylesheet)
