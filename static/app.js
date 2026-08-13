@@ -2791,10 +2791,10 @@ function chipEmpty(message) {
   return `<div class="chip-empty">${escapeHtml(message || '目前沒有資料。')}</div>`;
 }
 
-function renderChipRankingRows(items, emptyMessage) {
+function renderChipRankingRows(items, emptyMessage, columnLabel = '產業') {
   if (!items?.length) return chipEmpty(emptyMessage);
   const maxAbs = Math.max(...items.map((item) => Math.abs(Number(item.change_rate) || 0)), 0.01);
-  return `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>排名</th><th>股票</th><th>產業</th><th>本週變化</th><th>連續</th></tr></thead><tbody>${items.map((item, index) => {
+  return `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>排名</th><th>股票</th><th>${escapeHtml(columnLabel)}</th><th>本週變化</th><th>連續</th></tr></thead><tbody>${items.map((item, index) => {
     const streak = Number(item.change_rate) >= 0 ? item.consecutive_increase : item.consecutive_decrease;
     const width = Math.max(4, Math.abs(Number(item.change_rate) || 0) / maxAbs * 100);
     return `<tr><td>${index + 1}</td><td>${chipStockButton(item)}<small>${escapeHtml(item.market || '')}</small></td><td>${escapeHtml(item.industry || '未分類')}</td><td class="${toneClassFromNumber(item.change_rate)}"><strong>${formatSignedPercent(item.change_rate)}</strong><small>占比 ${formatPercentagePoints(item.ratio_change_pp)}</small><span class="chip-strength-bar"><i style="width:${width.toFixed(1)}%"></i></span></td><td>${Number(streak || 0)} 週</td></tr>`;
@@ -2897,8 +2897,8 @@ function renderChipDashboard(rankings, industries, featured) {
   elements.latestOutput.appendChild(template.content.cloneNode(true));
   document.getElementById('chip-ranking-date').textContent = `資料週 ${formatYmd(rankings.data_date)} · 有效比較母體 ${Number(rankings.comparison_stock_count || 0).toLocaleString('zh-TW')} 檔`;
   const noRankingMessage = rankings.message || '目前沒有符合條件的股票。';
-  document.getElementById('chip-increase-ranking').innerHTML = renderChipRankingRows(rankings.increase, noRankingMessage);
-  document.getElementById('chip-decrease-ranking').innerHTML = renderChipRankingRows(rankings.decrease, noRankingMessage);
+  document.getElementById('chip-increase-ranking').innerHTML = renderChipRankingRows(rankings.increase, noRankingMessage, '族群');
+  document.getElementById('chip-decrease-ranking').innerHTML = renderChipRankingRows(rankings.decrease, noRankingMessage, '族群');
   document.getElementById('chip-industry-ranking').innerHTML = renderChipIndustryRows(industries.items);
   document.getElementById('chip-featured-cards').innerHTML = renderChipFeatured(featured.items);
   bindChipDashboardEvents();

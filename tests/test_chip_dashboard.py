@@ -371,6 +371,46 @@ class ChipDashboardApiTests(unittest.TestCase):
             self.assertEqual(payload["comparison_stock_count"], 500)
             self.assertNotIn("6488", {item["code"] for item in payload["increase"]})
 
+    def test_weekly_rankings_use_forced_sector_for_industry_column(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            db_path = root / "chips.db"
+            forced_groups_path = root / "FORCED_SECTOR_GROUPS.md"
+            forced_groups_path.write_text(
+                "# 強制族群清單\n\n### 記憶體\n- 4967 十銓\n",
+                encoding="utf-8",
+            )
+            codes = ["4967"] + [f"{1000 + index}" for index in range(499)]
+            with closing(sqlite3.connect(db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                chip_dashboard.init_schema(conn)
+                chip_dashboard.upsert_stock_master(conn, [
+                    {
+                        "code": code,
+                        "name": "十銓" if code == "4967" else f"股票{code}",
+                        "market": "TWSE",
+                        "industry_name": "半導體業",
+                    }
+                    for code in codes
+                ])
+                rows = []
+                for code in codes:
+                    current_shares = 3_000_000 if code == "4967" else 1_100_000
+                    for data_date, shares in (("20260731", 1_000_000), ("20260807", current_shares)):
+                        rows.extend([
+                            {"資料日期": data_date, "證券代號": code, "持股分級": "12", "股數": str(shares), "人數": "1", "占集保庫存數比例%": "10"},
+                            {"資料日期": data_date, "證券代號": code, "持股分級": "17", "股數": "10000000", "人數": "2", "占集保庫存數比例%": "100"},
+                        ])
+                chip_dashboard.import_tdcc_rows(conn, rows)
+                chip_dashboard.recompute_metrics(conn)
+                conn.commit()
+
+            payload = chip_dashboard.rankings_payload(db_path, forced_groups_path=forced_groups_path)
+            item = next(item for item in payload["increase"] if item["code"] == "4967")
+
+            self.assertEqual(item["industry"], "記憶體")
+            self.assertEqual(payload["grouping_source"], "FORCED_SECTOR_GROUPS.md")
+
     def test_chip_dashboard_function_is_registered_as_display_only(self):
         spec = stock_app.FUNCTION_MAP["chip_dashboard"]
         self.assertEqual(spec.name, "台股籌碼分析儀表板")
@@ -434,6 +474,7 @@ class ChipDashboardFrontendContractTests(unittest.TestCase):
         self.assertIn("有效比較母體", self.javascript)
         self.assertIn("FORCED_SECTOR_GROUPS.md", self.build_script)
         self.assertIn("依 FORCED_SECTOR_GROUPS.md", self.template)
+        self.assertIn("renderChipRankingRows(rankings.increase, noRankingMessage, '族群')", self.javascript)
 
     def test_mobile_layout_and_non_color_signs_are_part_of_the_contract(self):
         self.assertIn("@media (max-width: 720px)", self.stylesheet)

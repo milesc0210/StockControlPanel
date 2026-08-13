@@ -193,7 +193,7 @@ FUNCTIONS: list[FunctionSpec] = [
         key=CHIP_DASHBOARD_FUNCTION_KEY,
         name="台股籌碼分析儀表板",
         category="籌碼分析",
-        description="整合每週集保大戶持股、三大法人與官方產業分類，查看排行榜、9 週趨勢及族群強弱。",
+        description="整合每週集保大戶持股、三大法人與自訂族群分類，查看排行榜、9 週趨勢及族群強弱。",
         executable=False,
     ),
     FunctionSpec(
@@ -3208,6 +3208,7 @@ def build_chip_rankings_payload() -> dict[str, Any]:
         DB_PATH,
         market=market.lower() if market == "ALL" else market,
         industry=industry,
+        forced_groups_path=BASE_DIR / "FORCED_SECTOR_GROUPS.md",
     )
 
 

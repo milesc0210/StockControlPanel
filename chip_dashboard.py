@@ -840,12 +840,21 @@ def _status_tags(row: sqlite3.Row) -> list[str]:
     return tags
 
 
-def _serialize_metric(row: sqlite3.Row) -> dict[str, Any]:
+def _serialize_metric(
+    row: sqlite3.Row,
+    *,
+    forced_group_by_code: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    code = str(row["code"])
+    if forced_group_by_code is None:
+        industry_name = row["industry_name"] or "未分類"
+    else:
+        industry_name = forced_group_by_code.get(code, "未分類")
     return {
-        "code": row["code"],
+        "code": code,
         "name": row["name"] or row["code"],
         "market": row["market"] or "",
-        "industry": row["industry_name"] or "未分類",
+        "industry": industry_name,
         "data_date": row["data_date"],
         "large_holder_lots": round(row["large_holder_shares"] / 1000.0, 2),
         "large_holder_ratio": row["large_holder_ratio"],
@@ -917,7 +926,10 @@ def rankings_payload(
     market: str = "all",
     industry: str = "",
     limit: int = 30,
+    forced_groups_path: Path | None = None,
 ) -> dict[str, Any]:
+    groups_path = forced_groups_path or db_path.parent / "FORCED_SECTOR_GROUPS.md"
+    _, forced_group_by_code = load_forced_sector_groups(groups_path)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         init_schema(conn)
@@ -925,6 +937,7 @@ def rankings_payload(
         if not data_date:
             return {
                 **_meta(None),
+                "grouping_source": groups_path.name,
                 "is_latest": False,
                 "comparison_stock_count": 0,
                 "increase": [],
@@ -948,6 +961,7 @@ def rankings_payload(
         if len(full_market_dates) < 2:
             return {
                 **_meta(data_date),
+                "grouping_source": groups_path.name,
                 "comparison_stock_count": 0,
                 "increase": [],
                 "decrease": [],
@@ -976,9 +990,16 @@ def rankings_payload(
         message = "" if increase or decrease else "目前只有一週集保快照；累積下一週後即可產生全市場增減排行。"
         return {
             **_meta(data_date),
+            "grouping_source": groups_path.name,
             "comparison_stock_count": comparison_stock_count,
-            "increase": [_serialize_metric(row) for row in increase],
-            "decrease": [_serialize_metric(row) for row in decrease],
+            "increase": [
+                _serialize_metric(row, forced_group_by_code=forced_group_by_code)
+                for row in increase
+            ],
+            "decrease": [
+                _serialize_metric(row, forced_group_by_code=forced_group_by_code)
+                for row in decrease
+            ],
             "message": message,
         }
 
