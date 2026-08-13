@@ -23,7 +23,7 @@
           <div id="self-update-progress-text" class="self-update-progress-text">更新中...</div>
         </div>
       </div>
-      <div id="function-groups" class="function-groups"></div>
+      <div id="function-groups" class="function-groups" data-custom-sector-function-key="custom_stock_sectors"></div>
     </aside>
 
     <main class="content">
@@ -60,6 +60,43 @@
           </div>
           <div id="latest-meta" class="meta-list"></div>
           <div id="latest-output" class="output-box empty">請先從左側點選功能。</div>
+          <template id="chip-dashboard-template">
+            <section class="chip-dashboard" aria-label="台股籌碼分析儀表板">
+              <header class="chip-dashboard-intro">
+                <div><strong>台股籌碼分析儀表板</strong><span>大戶門檻：持有 400 張以上</span></div>
+                <small>集保為每週資料，所有區塊均標示實際資料週。</small>
+              </header>
+              <form id="chip-search-form" class="chip-search-form" autocomplete="off">
+                <label for="chip-search-input">股票代號或名稱</label>
+                <div class="chip-search-row">
+                  <input id="chip-search-input" type="search" placeholder="例如 2330、台積電" minlength="2">
+                  <button class="primary-button" type="submit">查詢</button>
+                </div>
+                <div id="chip-search-suggestions" class="chip-search-suggestions" hidden></div>
+              </form>
+              <section id="chip-stock-analysis" class="chip-section chip-stock-analysis" hidden></section>
+              <section class="chip-section">
+                <div class="chip-section-heading"><div><p class="eyebrow">Weekly ranking</p><h3>本週籌碼增減排行</h3></div><span id="chip-ranking-date">資料週 —</span></div>
+                <div class="chip-ranking-tabs" role="tablist">
+                  <button type="button" class="active" data-chip-tab="increase">增加榜</button>
+                  <button type="button" data-chip-tab="decrease">減少榜</button>
+                </div>
+                <div class="chip-ranking-grid">
+                  <div id="chip-increase-ranking" class="chip-ranking-panel"></div>
+                  <div id="chip-decrease-ranking" class="chip-ranking-panel"></div>
+                </div>
+              </section>
+              <section class="chip-section">
+                <div class="chip-section-heading"><div><p class="eyebrow">Industry strength</p><h3>族群強弱排名</h3></div></div>
+                <div id="chip-industry-ranking" class="chip-industry-ranking"></div>
+              </section>
+              <section class="chip-section">
+                <div class="chip-section-heading"><div><p class="eyebrow">Featured</p><h3>熱門股票分析卡</h3></div></div>
+                <div id="chip-featured-cards" class="chip-featured-grid"></div>
+              </section>
+              <footer class="chip-disclaimer">本網站內容為公開歷史資料的整理與統計，僅供資訊與研究參考，不構成任何投資建議。資料可能因來源更新、延遲或計算方式而有所差異，投資人應自行判斷並承擔投資風險。</footer>
+            </section>
+          </template>
           <div id="artifact-list" class="artifact-list"></div>
         </article>
 
@@ -176,7 +213,11 @@
           <h3 id="kline-modal-title">TradingView K 線圖</h3>
           <p id="kline-modal-meta" class="kline-modal-meta"></p>
         </div>
-        <button id="kline-modal-close" class="text-button">關閉</button>
+        <div class="kline-modal-actions">
+          <button id="kline-signal-day-button" class="text-button kline-mode-button active" type="button">訊號日 K 線</button>
+          <button id="kline-tradingview-button" class="primary-button" type="button">開啟 TradingView 完整圖表</button>
+          <button id="kline-modal-close" class="text-button" type="button">關閉</button>
+        </div>
       </div>
       <div id="kline-modal-body" class="kline-modal-body">載入 TradingView 中...</div>
     </section>

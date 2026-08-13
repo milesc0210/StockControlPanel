@@ -1,11 +1,36 @@
 import subprocess
 import unittest
+from datetime import datetime
+from pathlib import Path
 from unittest.mock import call, patch
 
 import app as stock_app
 
 
 class MarketDataBackfillTests(unittest.TestCase):
+    def test_official_market_fetches_never_disable_tls_verification(self):
+        app_source = Path(stock_app.__file__).read_text(encoding="utf-8")
+        fetch_source = (Path(stock_app.__file__).parent / "scripts" / "twse_tpex_fetch.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("verify=False", app_source)
+        self.assertNotIn("verify=False", fetch_source)
+
+    def test_intraday_market_is_closed_on_an_exchange_holiday(self):
+        holiday = datetime.fromisoformat("2026-02-27T10:00:00+08:00")
+        with patch.object(stock_app, "trading_dates_for_year", return_value=["20260226", "20260302"]):
+            self.assertFalse(stock_app.is_intraday_market_open(holiday))
+
+    def test_kline_endpoints_reject_invalid_lookback_as_json(self):
+        client = stock_app.app.test_client()
+
+        single = client.get("/api/kline/2330?lookback_days=nope")
+        batch = client.post("/api/kline_batch", json={"codes": ["2330"], "lookback_days": "nope"})
+
+        self.assertEqual(single.status_code, 400)
+        self.assertEqual(batch.status_code, 400)
+        self.assertIn("error", single.get_json())
+        self.assertIn("error", batch.get_json())
+
     def test_missing_market_dates_finds_gaps_before_latest_date(self):
         trading_dates = [
             "20260715",
@@ -77,6 +102,8 @@ class MarketDataBackfillTests(unittest.TestCase):
                     cwd=stock_app.MILES_AGENT_ROOT,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     env=unittest.mock.ANY,
                 )
                 for date in missing_dates

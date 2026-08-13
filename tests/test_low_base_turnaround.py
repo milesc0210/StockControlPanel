@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "screen_low_base_turnaround.py"
@@ -27,6 +28,20 @@ class LowBaseTurnaroundTests(unittest.TestCase):
         self.assertEqual(mapping[("TWSE", "1111")], "半導體業")
         self.assertEqual(mapping[("TPEX", "2222")], "AI題材")
         self.assertNotIn("未分類", mapping.values())
+
+    def test_offline_theme_fallback_keeps_first_manual_rule(self):
+        import analyze_012_sector_groups as sector_groups
+
+        with (
+            patch.object(low_base, "_load_theme_cache", return_value={}),
+            patch.object(low_base, "_save_theme_cache"),
+            patch.object(sector_groups, "build_industry_lookup", side_effect=RuntimeError("offline")),
+        ):
+            mapping = low_base._theme_map()
+
+        self.assertEqual(mapping[("TWSE", "1605")], "電纜")
+        self.assertEqual(mapping[("TWSE", "2009")], "電纜")
+        self.assertEqual(mapping[("TWSE", "6505")], "四寶")
 
     def test_score_rewards_deeper_market_lag_with_same_turnaround(self):
         deeper_lag = low_base.compute_rank_score(

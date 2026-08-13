@@ -233,8 +233,8 @@ def _theme_map() -> dict[tuple[str, str], str]:
     fallback: dict[tuple[str, str], str] = {}
     for theme, codes in THEME_RULES:
         for code in codes:
-            fallback[("TWSE", str(code))] = str(theme)
-            fallback[("TPEX", str(code))] = str(theme)
+            fallback.setdefault(("TWSE", str(code)), str(theme))
+            fallback.setdefault(("TPEX", str(code)), str(theme))
     return fallback
 
 

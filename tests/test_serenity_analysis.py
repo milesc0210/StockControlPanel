@@ -64,6 +64,30 @@ class SerenityAnalysisTests(unittest.TestCase):
         toolset_index = command.index("-t")
         self.assertEqual(command[toolset_index + 1], "browser,web")
 
+    def test_single_stock_uses_fast_research_limits(self):
+        with patch.object(stock_app, "run_serenity_cli", return_value="快速分析") as runner:
+            report, worker_count, mode = stock_app.run_serenity_research(
+                "標準選股",
+                "20260721",
+                [{"code": "2330", "name": "台積電"}],
+            )
+
+        self.assertEqual(report, "快速分析")
+        self.assertEqual(worker_count, 1)
+        self.assertEqual(mode, "快速單一研究代理")
+        self.assertEqual(runner.call_args.kwargs["max_turns"], stock_app.SERENITY_FAST_MAX_TURNS)
+        self.assertIn("快速研究代理", runner.call_args.args[0])
+
+    def test_multiple_stocks_are_split_across_parallel_research_agents(self):
+        stocks = [{"code": str(2330 + index), "name": f"股票{index}"} for index in range(5)]
+        with patch.object(stock_app, "run_serenity_cli", side_effect=["代理一", "代理二", "代理三"]) as runner:
+            report, worker_count, mode = stock_app.run_serenity_research("標準選股", "20260721", stocks)
+
+        self.assertEqual(worker_count, 3)
+        self.assertEqual(mode, "平行快速研究（3 個代理）")
+        self.assertEqual(report.count("【平行研究代理"), 3)
+        self.assertEqual(runner.call_count, 3)
+
     def test_api_rejects_empty_stock_list(self):
         response = self.client.post(
             "/api/serenity/pre_breakout_standard",
@@ -88,6 +112,7 @@ class SerenityAnalysisTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["analysis"], "分析完成")
         self.assertEqual(payload["stock_count"], 1)
+        self.assertEqual(payload["stock_codes"], ["2330"])
         runner.assert_called_once()
 
     def test_api_persists_analysis_and_get_restores_it(self):
@@ -137,6 +162,28 @@ class SerenityAnalysisTests(unittest.TestCase):
         self.assertEqual(force_response.get_json()["analysis"], "強制更新分析")
         self.assertFalse(force_response.get_json()["from_cache"])
         force_runner.assert_called_once()
+
+    def test_post_does_not_reuse_cache_for_different_selected_codes(self):
+        with patch.object(stock_app, "run_serenity_cli", side_effect=["第一組分析", "第二組分析"]) as runner:
+            first = self.client.post(
+                "/api/serenity/pre_breakout_standard",
+                json={
+                    "result_date": "20260723",
+                    "stocks": [{"code": "2330", "name": "台積電", "grade": "A"}],
+                },
+            )
+            second = self.client.post(
+                "/api/serenity/pre_breakout_standard",
+                json={
+                    "result_date": "20260723",
+                    "stocks": [{"code": "2317", "name": "鴻海", "grade": "A"}],
+                },
+            )
+
+        self.assertEqual(first.get_json()["analysis"], "第一組分析")
+        self.assertEqual(second.get_json()["analysis"], "第二組分析")
+        self.assertEqual(second.get_json()["stock_codes"], ["2317"])
+        self.assertEqual(runner.call_count, 2)
 
 
 if __name__ == "__main__":

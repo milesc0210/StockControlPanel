@@ -16,6 +16,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+import requests
+
 from portable_runtime import DATA_DIR, load_dotenv
 
 load_dotenv()
@@ -31,6 +33,12 @@ HEADERS = {
 }
 
 
+def fetch_official_json(url: str) -> dict:
+    response = requests.get(url, headers=HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
 def fetch_twse(date_str: str) -> dict:
     """Fetch TWSE daily trading data via MI_INDEX API (ALLBUT0999).
     Returns dict with keys: date, source, count, fields, data.
@@ -39,9 +47,7 @@ def fetch_twse(date_str: str) -> dict:
         f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"
         f"?response=json&date={date_str}&type=ALLBUT0999"
     )
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        raw = json.loads(resp.read().decode("utf-8"))
+    raw = fetch_official_json(url)
 
     # Find the table with 16 fields and >1000 rows
     for t in raw.get("tables", []):
@@ -75,9 +81,7 @@ def fetch_tpex(date_str: str) -> dict:
         f"&d={urllib.parse.quote(roc_date)}"
         f"&se=EW&_={int(time.time() * 1000)}"
     )
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    data = fetch_official_json(url)
 
     # Validate
     tables = data.get("tables", [])
@@ -142,12 +146,12 @@ def main():
         if not ok:
             all_ok = False
     except Exception as e:
-        results.append(f"❌ TPEX 失敗：{e}")
+        results.append(f"[FAIL] TPEX 失敗：{e}")
         all_ok = False
 
     # ── Output ──
     now = datetime.now().strftime("%H:%M")
-    status = "✅" if all_ok else "❌"
+    status = "[OK]" if all_ok else "[FAIL]"
     report = f"{status} {' / '.join(results)} | 時間：{now}"
     print(report)
 

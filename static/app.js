@@ -7,6 +7,9 @@ const state = {
   selectedFunction: null,
   currentRun: null,
   currentKlineCode: '',
+  currentKlinePayload: null,
+  currentKlineSymbol: '',
+  currentKlineMode: 'signal-day',
   fearGreed: null,
   backtestResult: null,
   backtestPresets: [],
@@ -21,6 +24,9 @@ const state = {
   updateStatusChecked: false,
 };
 
+const CUSTOM_SECTOR_FUNCTION_KEY = 'custom_stock_sectors';
+const CUSTOM_SECTOR_CATEGORY = '自訂功能';
+const CHIP_DASHBOARD_FUNCTION_KEY = 'chip_dashboard';
 const LIGHTWEIGHT_CHARTS_SCRIPT = 'https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js';
 const LIGHTWEIGHT_CHARTS_INTEGRITY = 'sha384-q1KYLSKHgBnW5tWYGGR8+6YV4/iPy31dILoF2I1OD7XiVUvHEp/TaxIQVmB0j3R2';
 const KLINE_CHART_LOOKBACK_DAYS = 1000;
@@ -70,6 +76,8 @@ const elements = {
   klineModalTitle: document.getElementById('kline-modal-title'),
   klineModalMeta: document.getElementById('kline-modal-meta'),
   klineModalClose: document.getElementById('kline-modal-close'),
+  klineSignalDayButton: document.getElementById('kline-signal-day-button'),
+  klineTradingViewButton: document.getElementById('kline-tradingview-button'),
   backtestPanel: document.getElementById('backtest-panel'),
   backtestStartDate: document.getElementById('backtest-start-date'),
   backtestEndDate: document.getElementById('backtest-end-date'),
@@ -198,6 +206,14 @@ function isFearGreedFunction(functionKey = state.selectedKey) {
   return functionKey === 'cnn_fear_greed_index';
 }
 
+function isCustomSectorFunction(functionKey = state.selectedKey) {
+  return functionKey === CUSTOM_SECTOR_FUNCTION_KEY;
+}
+
+function isChipDashboardFunction(functionKey = state.selectedKey) {
+  return functionKey === CHIP_DASHBOARD_FUNCTION_KEY;
+}
+
 function isIntradayFunction(functionKey = state.selectedKey) {
   return [
     'new_high_black_volume_contraction',
@@ -209,12 +225,19 @@ function isIntradayFunction(functionKey = state.selectedKey) {
   ].includes(functionKey);
 }
 
+function isDirectCurrentIntradayFunction(functionKey = state.selectedKey) {
+  return [
+    'new_high_black_volume_contraction',
+    'pre_breakout_standard',
+  ].includes(functionKey);
+}
+
 function isIntradayAvailable() {
   return isIntradayFunction() && Boolean(state.selectedDate) && Boolean(state.marketState?.market_open);
 }
 
 function isCurrentIntradaySelection() {
-  return state.selectedKey === 'new_high_black_volume_contraction'
+  return isDirectCurrentIntradayFunction()
     && Boolean(state.intradayDate)
     && state.selectedDate === state.intradayDate
     && Boolean(state.marketState?.market_open);
@@ -222,7 +245,7 @@ function isCurrentIntradaySelection() {
 
 function isSelectableDate(date) {
   return state.dates.includes(date)
-    || (state.selectedKey === 'new_high_black_volume_contraction' && date === state.intradayDate);
+    || (isDirectCurrentIntradayFunction() && date === state.intradayDate);
 }
 
 function getInstitutionalMap() {
@@ -245,9 +268,9 @@ function getCurrentSerenityStocks() {
       code: quote.code || '',
       name: quote.name || '',
       market: quote.market || '',
-      theme: '',
-      grade: '',
-      rank_score: '',
+      theme: quote.theme || '',
+      grade: quote.grade || '',
+      rank_score: quote.rank_score || '',
       close: quote.last_price ?? '',
       volume: quote.trade_volume ?? '',
     })).filter((stock) => stock.code);
@@ -320,6 +343,9 @@ function renderSerenityResult(payload) {
     ['耗時', formatDuration(Number(payload.duration_seconds || 0))],
     ['資料來源', payload.from_cache ? 'DB 快取' : 'Hermes 即時分析'],
   ];
+  if (!payload.from_cache && payload.research_mode) {
+    metaItems.push(['研究模式', payload.research_mode]);
+  }
   if (payload.from_cache && payload.cached_at) {
     metaItems.push(['快取時間', compactTimestamp(payload.cached_at)]);
   }
@@ -365,15 +391,17 @@ async function loadSerenityCache() {
 
 function renderActionButtons() {
   const isFearGreed = isFearGreedFunction();
-  const showSerenity = !isFearGreed && Boolean(state.selectedFunction?.executable);
+  const isCustomSector = isCustomSectorFunction();
+  const isChipDashboard = isChipDashboardFunction();
+  const showSerenity = !isFearGreed && !isCustomSector && !isChipDashboard && Boolean(state.selectedFunction?.executable);
   const serenityStocks = getCurrentSerenityStocks();
-  const selectedSerenityStocks = getSelectedSerenityStocks();
+  const selectedSerenityStocks = showSerenity ? getSelectedSerenityStocks() : [];
   const showInstitutional = !isFearGreed && isPreBreakoutFunction() && Boolean(state.selectedDate);
   const showIntraday = !isFearGreed && isIntradayFunction() && Boolean(state.selectedDate);
   const showBacktest = !isFearGreed && isBacktestFunction();
-  elements.dateControlWrap.hidden = isFearGreed;
-  elements.runButton.hidden = !state.selectedFunction?.executable;
-  elements.refreshFutureButton.hidden = isFearGreed || !state.selectedFunction?.executable;
+  elements.dateControlWrap.hidden = isFearGreed || isChipDashboard;
+  elements.runButton.hidden = isCustomSector || isChipDashboard || !state.selectedFunction?.executable;
+  elements.refreshFutureButton.hidden = isFearGreed || isCustomSector || isChipDashboard || !state.selectedFunction?.executable;
   elements.serenityButton.hidden = !showSerenity;
   elements.serenityPanel.hidden = !showSerenity;
   elements.serenityButton.textContent = selectedSerenityStocks.length
@@ -550,6 +578,17 @@ function formatChangePercent(value) {
   return `${sign}${number.toFixed(2)}%`;
 }
 
+function formatSignedPercent(value) {
+  return formatChangePercent(value);
+}
+
+function formatPercentagePoints(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  const sign = number > 0 ? '+' : '';
+  return `${sign}${number.toFixed(2)} 個百分點`;
+}
+
 function toneClassFromNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '';
@@ -721,7 +760,8 @@ function renderMiniKlineSvg(rows) {
 
 async function hydrateInlineKlines(stocks) {
   const codes = [...new Set((stocks || []).map((stock) => String(stock.code || '').trim()).filter(Boolean))];
-  if (!codes.length || !state.selectedDate) return;
+  const klineEndDate = state.currentRun?.intraday?.payload?.source_result_date || state.selectedDate;
+  if (!codes.length || !klineEndDate) return;
 
   try {
     const response = await fetch('/api/kline_batch', {
@@ -729,7 +769,7 @@ async function hydrateInlineKlines(stocks) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         codes,
-        end_date: state.selectedDate,
+        end_date: klineEndDate,
         lookback_days: 40,
       }),
     });
@@ -777,6 +817,9 @@ function closeKlineModal() {
   elements.klineModal.setAttribute('aria-hidden', 'true');
   elements.klineModalBody.replaceChildren();
   state.currentKlineCode = '';
+  state.currentKlinePayload = null;
+  state.currentKlineSymbol = '';
+  state.currentKlineMode = 'signal-day';
 }
 
 function klineModalCacheKey(code, endDate, lookbackDays = 60) {
@@ -808,15 +851,36 @@ function setCachedKlineModalPayload(payload, endDate, lookbackDays = 60) {
 
 function openKlineModalShell(code, name, market) {
   state.currentKlineCode = code;
+  state.currentKlinePayload = null;
+  state.currentKlineSymbol = '';
+  state.currentKlineMode = 'signal-day';
   elements.klineModal.classList.remove('hidden');
   elements.klineModal.setAttribute('aria-hidden', 'false');
-  elements.klineModalTitle.textContent = `${code} ${name}｜TradingView K 線圖`;
-  elements.klineModalMeta.textContent = `${market || '台股'} ｜ TradingView 日線 ｜ 連線中...`;
+  elements.klineModalTitle.textContent = `${code} ${name}｜訊號日 K 線`;
+  elements.klineModalMeta.textContent = `${market || '台股'} ｜ 本機歷史資料 ｜ 連線中...`;
   elements.klineModalBody.innerHTML = '<div class="kline-loading">正在載入 TradingView K 線圖...</div>';
+  elements.klineSignalDayButton.disabled = true;
+  elements.klineTradingViewButton.disabled = true;
+  setKlineModeButtonState('signal-day');
 }
 
 function linePath(points) {
   return points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x} ${y}`).join(' ');
+}
+
+function setKlineModeButtonState(mode) {
+  state.currentKlineMode = mode;
+  elements.klineSignalDayButton.classList.toggle('active', mode === 'signal-day');
+}
+
+function openTradingViewFullChart() {
+  const symbol = state.currentKlineSymbol;
+  if (!symbol) {
+    elements.klineModalMeta.textContent = 'TradingView 完整圖表目前缺少股票市場資訊。';
+    return;
+  }
+  const url = buildTradingViewSymbolUrl(symbol);
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function renderKlineModal(payload) {
@@ -944,6 +1008,19 @@ function renderLocalKlineFallback(payload) {
   };
   renderKlineModal(fallbackPayload);
   elements.klineModalMeta.textContent += ' ｜ TradingView 元件無法載入，已改用本機 K 線圖';
+}
+
+async function renderSignalDayKline(requestId = klineRequestSerial) {
+  if (!state.currentKlinePayload || !state.currentKlineSymbol) return;
+  setKlineModeButtonState('signal-day');
+  try {
+    const lightweightCharts = await loadLightweightCharts();
+    if (requestId !== klineRequestSerial || state.currentKlineCode !== state.currentKlinePayload.code) return;
+    renderTradingViewKline(state.currentKlinePayload, lightweightCharts, state.currentKlineSymbol);
+  } catch (chartError) {
+    if (requestId !== klineRequestSerial) return;
+    renderLocalKlineFallback(state.currentKlinePayload);
+  }
 }
 
 function loadLightweightCharts() {
@@ -1149,8 +1226,9 @@ function renderTradingViewKline(payload, lightweightCharts, symbol) {
   window.requestAnimationFrame(resize);
 
   const selectedDateText = state.selectedDate ? ` ｜ 選股日期 ${formatYmd(state.selectedDate)}` : '';
-  elements.klineModalTitle.textContent = `${payload.code} ${payload.name}｜TradingView K 線圖`;
-  elements.klineModalMeta.textContent = `${payload.market} ｜ TradingView Lightweight Charts 日線 ｜ ${formatYmd(payload.start_date)} ～ ${formatYmd(payload.end_date)} ｜ 共 ${payload.count} 根${selectedDateText}`;
+  setKlineModeButtonState('signal-day');
+  elements.klineModalTitle.textContent = `${payload.code} ${payload.name}｜訊號日 K 線`;
+  elements.klineModalMeta.textContent = `${payload.market} ｜ 本機歷史資料 ｜ ${formatYmd(payload.start_date)} ～ ${formatYmd(payload.end_date)} ｜ 共 ${payload.count} 根${selectedDateText}`;
 }
 
 async function openKlineModal(code, name, market) {
@@ -1170,20 +1248,15 @@ async function openKlineModal(code, name, market) {
       throw new Error(payload.error || '讀取長期 K 線資料失敗');
     }
     if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
-    let lightweightCharts;
-    try {
-      lightweightCharts = await loadLightweightCharts();
-      if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
-    } catch (chartError) {
-      if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
-      renderLocalKlineFallback(payload);
-      return;
-    }
     const symbol = buildTradingViewSymbol(code, normalizedMarket || payload.market);
     if (!symbol) {
       throw new Error('找不到股票的 TWSE / TPEX 市場資訊。');
     }
-    renderTradingViewKline(payload, lightweightCharts, symbol);
+    state.currentKlinePayload = payload;
+    state.currentKlineSymbol = symbol;
+    elements.klineSignalDayButton.disabled = false;
+    elements.klineTradingViewButton.disabled = false;
+    await renderSignalDayKline(requestId);
   } catch (error) {
     if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;
     elements.klineModalBody.innerHTML = `<div class="empty-block">${escapeHtml(String(error.message || error))}</div>`;
@@ -1224,7 +1297,7 @@ function renderGroups() {
 function renderDateOptions() {
   const hasDates = Boolean(state.dates.length);
   const earliest = hasDates ? state.dates[state.dates.length - 1] : '';
-  const latest = state.selectedKey === 'new_high_black_volume_contraction' && state.intradayDate
+  const latest = isDirectCurrentIntradayFunction() && state.intradayDate
     ? state.intradayDate
     : (hasDates ? state.dates[0] : '');
 
@@ -1234,7 +1307,7 @@ function renderDateOptions() {
   elements.dateInput.disabled = !hasDates;
 
   if (hasDates) {
-    elements.dateNote.textContent = state.selectedKey === 'new_high_black_volume_contraction' && state.intradayDate
+    elements.dateNote.textContent = isDirectCurrentIntradayFunction() && state.intradayDate
       ? `可選擇的日期：${toInputDate(earliest).replaceAll('-', '/')} 起；目前盤中日期 ${toInputDate(state.intradayDate).replaceAll('-', '/')} 可直接選股`
       : `可選擇的日期：${toInputDate(earliest).replaceAll('-', '/')} 起的交易日`;
   } else {
@@ -2193,13 +2266,86 @@ function renderLowBase(parsed) {
   hydrateInlineKlines(stocks);
 }
 
+function renderPreBreakoutIntraday(parsed, stocks, intradaySummary, quoteDateLabel, quoteVolumeLabel) {
+  const groupedStocks = parsed.sector ? enrichMaBullishStocks(stocks, parsed.sector) : stocks;
+  const totalColumns = (parsed.sector ? 1 : 0) + 10;
+  const statusText = `${intradaySummary.matched_count}/${intradaySummary.count} 符合｜${compactTimestamp(intradaySummary.finished_at)}`;
+  let html = `<div class="summary-grid">${buildSummaryChips({
+    '交易日': intradaySummary.result_date,
+    '來源完整日': intradaySummary.source_result_date,
+    '入選數量': intradaySummary.matched_count,
+    '即時行情': statusText,
+  })}</div>`;
+
+  if (!groupedStocks.length) {
+    html += '<div class="empty-block">目前盤中沒有符合標準選股 A 級條件的股票。</div>';
+    elements.latestOutput.className = 'output-box rich-output';
+    elements.latestOutput.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  if (parsed.sector) html += '<th>族群</th>';
+  html += `<th>等級</th><th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th class="th-name" style="text-align:left">名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">${escapeHtml(quoteDateLabel)}</th><th style="text-align:right">${escapeHtml(quoteVolumeLabel)}</th><th style="text-align:right">MA5</th><th style="text-align:right">MA10</th><th>狀態</th>`;
+  html += '</tr></thead><tbody>';
+
+  let currentTheme = null;
+  for (const stock of groupedStocks) {
+    const tone = gradeTone(stock.grade);
+    if (parsed.sector && stock.themeName && stock.themeName !== currentTheme) {
+      currentTheme = stock.themeName;
+      const themeMeta = parsed.sector.themeRows.find((row) => row.themeName === stock.themeName);
+      const themeLabel = themeMeta ? `${themeMeta.themeName}｜${themeMeta.count} 檔` : stock.themeName;
+      html += `<tr class="group-divider-row"><td colspan="${totalColumns}"><div class="group-divider-label">${escapeHtml(themeLabel)}</div></td></tr>`;
+    }
+    const intradayTone = toneClassFromNumber(stock.change_percent);
+    html += '<tr>';
+    if (parsed.sector) html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(stock.themeName || '—')}</span></td>`;
+    html += `<td class="td-grade"><span class="grade-pill ${tone}">${escapeHtml(stock.grade || 'A')}</span></td>`;
+    html += `<td class="td-number td-score">${escapeHtml(stock.rankScore || stock.rank_score || '—')}</td>`;
+    html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
+    html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
+    html += buildInlineKlineSlot(stock);
+    html += `<td class="td-future td-intraday ${intradayTone}"><strong>${formatPrice(stock.last_price)}</strong><span class="${intradayTone}">${escapeHtml(formatChangePercent(stock.change_percent))}</span></td>`;
+    html += `<td class="td-number">${formatVolume(stock.trade_volume)}</td>`;
+    html += `<td class="td-number">${formatPrice(stock.ma5)}</td>`;
+    html += `<td class="td-number">${formatPrice(stock.ma10)}</td>`;
+    html += '<td><span class="status-pill success">盤中符合</span></td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+  elements.latestOutput.className = 'output-box rich-output';
+  elements.latestOutput.innerHTML = html;
+  installSerenitySelectionControls(groupedStocks);
+  hydrateInlineKlines(groupedStocks);
+}
+
 function renderPreBreakout(parsed) {
   const stocks = parsed.sector ? enrichMaBullishStocks(parsed.stocks, parsed.sector) : parsed.stocks;
   const institutionalMap = getInstitutionalMap();
   const institutionalSummary = state.currentRun?.institutional?.payload;
   const intradayMap = getIntradayMap();
   const intradaySummary = state.currentRun?.intraday?.payload;
+  const currentIntradayRun = Boolean(state.currentRun?.current_intraday);
+  const quoteDateLabel = intradaySummary?.quote_date ? `${formatYmd(intradaySummary.quote_date)}股價` : '即時價';
+  const quoteVolumeLabel = intradaySummary?.quote_date ? `${formatYmd(intradaySummary.quote_date)}量` : '即時量';
   const showIntradayColumns = isIntradayFunction();
+
+  if (currentIntradayRun && intradaySummary) {
+    const candidateMap = new Map(parsed.stocks.map((stock) => [stock.code, stock]));
+    const liveStocks = Object.values(intradayMap)
+      .filter((quote) => quote?.matched === true)
+      .map((quote) => ({
+        ...(candidateMap.get(quote.code) || {}),
+        ...quote,
+        rankScore: quote.rank_score || candidateMap.get(quote.code)?.rankScore || '',
+        close: quote.last_price ?? candidateMap.get(quote.code)?.close ?? '',
+        volume: quote.trade_volume ?? candidateMap.get(quote.code)?.volume ?? '',
+      }));
+    renderPreBreakoutIntraday(parsed, liveStocks, intradaySummary, quoteDateLabel, quoteVolumeLabel);
+    return;
+  }
 
   if (!stocks.length) {
     elements.latestOutput.className = 'output-box rich-output';
@@ -2228,7 +2374,7 @@ function renderPreBreakout(parsed) {
   if (parsed.sector) html += '<th>族群</th>';
   html += '<th>等級</th><th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th class="th-name" style="text-align:left">名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th>';
   if (showIntradayColumns) {
-    html += '<th style="text-align:center">即時價</th><th style="text-align:right">即時量</th>';
+    html += `<th style="text-align:center">${escapeHtml(quoteDateLabel)}</th><th style="text-align:right">${escapeHtml(quoteVolumeLabel)}</th>`;
   }
   html += '<th style="text-align:right">法人合計</th>';
 
@@ -2427,6 +2573,133 @@ function renderMaBullish(parsed) {
   hydrateInlineKlines(stocks);
 }
 
+function customSectorStockForMaColumns(stock) {
+  return {
+    ...stock,
+    rankScore: stock.rankScore || '—',
+    close: stock.close || '—',
+    volume: stock.volume ? `${floorVolumeText(stock.volume)}` : '—',
+    multiple: stock.multiple || '—',
+    futureDays: Array.isArray(stock.futureDays) ? stock.futureDays : [],
+  };
+}
+
+function customSectorGroupId(groupIndex) {
+  return `custom-sector-group-${groupIndex}`;
+}
+
+function renderCustomSectorRanking(rankings) {
+  const items = Array.isArray(rankings) ? rankings.slice(0, 10) : [];
+  if (!items.length) return '';
+  let html = '<section class="custom-sector-ranking" aria-label="族群排名">';
+  html += '<div class="custom-sector-ranking-heading"><h3>族群排名</h3><span>依個股平均排序分數</span></div>';
+  html += '<div class="custom-sector-ranking-list">';
+  for (const item of items) {
+    const averageScore = Number(item.averageRankScore);
+    const scoreText = Number.isFinite(averageScore) ? averageScore.toFixed(2) : '—';
+    const targetId = customSectorGroupId(item.groupIndex);
+    html += `<button type="button" class="custom-sector-rank-item" data-custom-sector-target="${escapeHtml(targetId)}" title="移到${escapeHtml(item.name)}族群">
+      <span class="custom-sector-rank-number">${escapeHtml(item.rank)}</span>
+      <span class="custom-sector-rank-name">${escapeHtml(item.name)}</span>
+      <span class="custom-sector-rank-score">平均 ${escapeHtml(scoreText)}</span>
+      <span class="custom-sector-rank-count">${escapeHtml(item.count)} 檔</span>
+    </button>`;
+  }
+  html += '</div></section>';
+  return html;
+}
+
+function bindCustomSectorRankingJump() {
+  document.querySelectorAll('.custom-sector-rank-item').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = document.getElementById(button.dataset.customSectorTarget || '');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.classList.remove('custom-sector-highlight');
+      window.requestAnimationFrame(() => target.classList.add('custom-sector-highlight'));
+      window.setTimeout(() => target.classList.remove('custom-sector-highlight'), 1600);
+    });
+  });
+}
+
+function renderCustomSectorTable(group, groupIndex) {
+  const stocks = (group.stocks || []).map(customSectorStockForMaColumns);
+  const maxFutureDays = Math.min(5, Math.max(0, ...stocks.map((stock) => stock.futureDays.length)));
+  let html = `<section id="${customSectorGroupId(groupIndex)}" class="custom-sector-block"><div class="custom-sector-heading"><h3>${escapeHtml(group.name)}</h3><span>${escapeHtml(group.count ?? stocks.length)} 檔</span></div>`;
+  if (!stocks.length) {
+    return `${html}<div class="empty-block">這個族群在選定日期沒有可用資料。</div></section>`;
+  }
+
+  html += '<div class="table-wrapper"><table class="stock-table"><thead><tr>';
+  html += '<th>族群</th><th class="th-score" style="text-align:right">排序分數</th><th>代號</th><th>名稱</th><th class="th-mini-kline">40日K線</th><th style="text-align:right">收盤</th><th style="text-align:right">成交量</th><th style="text-align:right">量能倍數</th>';
+  if (maxFutureDays > 0) {
+    const headerStock = stocks.find((stock) => stock.futureDays.length >= maxFutureDays);
+    for (const day of (headerStock?.futureDays || []).slice(0, maxFutureDays)) {
+      html += `<th style="text-align:center">${escapeHtml(formatYmd(day.date).slice(5))}</th>`;
+    }
+    html += '<th style="text-align:center">合計%</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const stock of stocks) {
+    html += '<tr>';
+    html += `<td class="td-theme"><span class="theme-pill">${escapeHtml(group.name)}</span></td>`;
+    html += `<td class="td-number td-score">${escapeHtml(stock.rankScore)}</td>`;
+    html += `<td class="td-code">${buildCodeButton(stock)}</td>`;
+    html += `<td class="td-name">${escapeHtml(stock.name)}</td>`;
+    html += buildInlineKlineSlot(stock);
+    html += `<td class="td-number">${escapeHtml(stock.close)}</td>`;
+    html += `<td class="td-number">${escapeHtml(stock.volume)}</td>`;
+    html += `<td class="td-number up-text">${escapeHtml(stock.multiple)}${stock.multiple !== '—' ? '倍' : ''}</td>`;
+    if (maxFutureDays > 0) {
+      for (let index = 0; index < maxFutureDays; index += 1) {
+        const day = stock.futureDays[index];
+        if (!day) {
+          html += '<td class="td-future td-empty">—</td>';
+          continue;
+        }
+        const tone = day.pctFromPrev.startsWith('+') ? 'up-text' : day.pctFromPrev.startsWith('-') ? 'down-text' : '';
+        html += `<td class="td-future"><strong>${escapeHtml(day.close)}</strong><span class="${tone}">${escapeHtml(day.pctFromPrev)}</span></td>`;
+      }
+      const lastDay = stock.futureDays[Math.min(stock.futureDays.length, maxFutureDays) - 1];
+      html += lastDay
+        ? `<td class="td-future td-total"><span class="${lastDay.pctFromSignal.startsWith('+') ? 'up-text' : lastDay.pctFromSignal.startsWith('-') ? 'down-text' : ''}">${escapeHtml(lastDay.pctFromSignal)}</span></td>`
+        : '<td class="td-future td-empty">—</td>';
+    }
+    html += '</tr>';
+  }
+  html += `</tbody></table></div></section>`;
+  return html;
+}
+
+function renderCustomSectors(payload) {
+  state.currentRun = null;
+  elements.latestMeta.innerHTML = '';
+  elements.artifactList.innerHTML = '';
+  const metaItems = [
+    ['交易日', formatYmd(payload.result_date)],
+    ['族群數量', `${payload.group_count || 0} 組`],
+    ['股票數量', `${payload.stock_count || 0} 檔`],
+    ['資料來源', '手動自訂族群清單'],
+  ];
+  for (const [label, value] of metaItems) {
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    div.textContent = `${label}：${value}`;
+    elements.latestMeta.appendChild(div);
+  }
+
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+  const rankingHtml = renderCustomSectorRanking(payload.rankings);
+  const groupHtml = groups.map((group, groupIndex) => renderCustomSectorTable(group, groupIndex)).join('');
+  elements.latestOutput.className = 'output-box rich-output custom-sector-output';
+  elements.latestOutput.innerHTML = rankingHtml + (groupHtml || '<div class="empty-block">目前沒有可顯示的自訂股票族群。</div>');
+  bindCustomSectorRankingJump();
+  const allStocks = groups.flatMap((group) => group.stocks || []).map(customSectorStockForMaColumns);
+  hydrateInlineKlines(allStocks);
+  setStatus(groups.length ? '自訂族群已載入' : '沒有自訂族群資料', groups.length ? 'success' : 'neutral');
+}
+
 function renderOutput(run) {
   const text = run.output_text || '(無輸出)';
   const parsedNewHighBlack = parseNewHighBlackOutput(text);
@@ -2510,7 +2783,156 @@ async function refreshMarketState() {
   }
 }
 
+function chipStockButton(item) {
+  return `<button type="button" class="chip-stock-link" data-chip-code="${escapeHtml(item.code)}">${escapeHtml(item.code)} ${escapeHtml(item.name || '')}</button>`;
+}
+
+function chipEmpty(message) {
+  return `<div class="chip-empty">${escapeHtml(message || '目前沒有資料。')}</div>`;
+}
+
+function renderChipRankingRows(items, emptyMessage) {
+  if (!items?.length) return chipEmpty(emptyMessage);
+  const maxAbs = Math.max(...items.map((item) => Math.abs(Number(item.change_rate) || 0)), 0.01);
+  return `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>排名</th><th>股票</th><th>產業</th><th>本週變化</th><th>連續</th></tr></thead><tbody>${items.map((item, index) => {
+    const streak = Number(item.change_rate) >= 0 ? item.consecutive_increase : item.consecutive_decrease;
+    const width = Math.max(4, Math.abs(Number(item.change_rate) || 0) / maxAbs * 100);
+    return `<tr><td>${index + 1}</td><td>${chipStockButton(item)}<small>${escapeHtml(item.market || '')}</small></td><td>${escapeHtml(item.industry || '未分類')}</td><td class="${toneClassFromNumber(item.change_rate)}"><strong>${formatSignedPercent(item.change_rate)}</strong><small>占比 ${formatPercentagePoints(item.ratio_change_pp)}</small><span class="chip-strength-bar"><i style="width:${width.toFixed(1)}%"></i></span></td><td>${Number(streak || 0)} 週</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+function renderChipIndustryRows(items) {
+  if (!items?.length) return chipEmpty('目前至少需要兩週全市場集保資料，才能計算族群強弱。');
+  return `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>排名</th><th>族群</th><th>分數</th><th>週增減率中位數</th><th>增加比例</th><th>領先股票</th></tr></thead><tbody>${items.map((item) => `<tr><td>${item.rank}</td><td><strong>${escapeHtml(item.industry)}</strong><small>${item.valid_count} 檔有效成員</small></td><td>${Number(item.score).toFixed(1)}</td><td class="${toneClassFromNumber(item.median_change_rate)}">${formatSignedPercent(item.median_change_rate)}</td><td>${Number(item.increase_ratio).toFixed(1)}%</td><td>${chipStockButton(item.leader || {})}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderChipFeatured(items) {
+  if (!items?.length) return chipEmpty('累積第二週集保資料後，系統會依透明規則產生熱門股票卡。');
+  return items.map((item) => `<button type="button" class="chip-featured-card" data-chip-code="${escapeHtml(item.code)}"><span>${escapeHtml(item.industry || '未分類')}</span><strong>${escapeHtml(item.name)} ${escapeHtml(item.code)}</strong><em class="${toneClassFromNumber(item.change_rate)}">${formatSignedPercent(item.change_rate)}</em><small>有效母體第 ${item.market_rank || '—'} 名 · 連續增加 ${item.consecutive_increase || 0} 週</small></button>`).join('');
+}
+
+function renderChipStockAnalysis(payload) {
+  const mount = document.getElementById('chip-stock-analysis');
+  if (!mount) return;
+  const stock = payload.stock || {};
+  const summary = payload.summary;
+  const history = payload.history || [];
+  const institutional = payload.institutional || [];
+  const peers = payload.industry_comparison || [];
+  const maxHistory = Math.max(...history.map((item) => Math.abs(Number(item.change_rate) || 0)), 0.01);
+  mount.hidden = false;
+  mount.innerHTML = `
+    <div class="chip-section-heading"><div><p class="eyebrow">Stock analysis</p><h3>${escapeHtml(stock.name)} ${escapeHtml(stock.code)}</h3></div><span>${escapeHtml(stock.market || '')} · ${escapeHtml(stock.industry || '未分類')} · 資料週 ${formatYmd(payload.data_date)}</span></div>
+    ${summary ? `<div class="chip-summary-grid"><div><span>本週籌碼增減率</span><strong class="${toneClassFromNumber(summary.change_rate)}">${formatSignedPercent(summary.change_rate)}</strong></div><div><span>持股占比變化</span><strong class="${toneClassFromNumber(summary.ratio_change_pp)}">${formatPercentagePoints(summary.ratio_change_pp)}</strong></div><div><span>大戶持股占比</span><strong>${Number(summary.large_holder_ratio).toFixed(2)}%</strong></div><div><span>有效母體／族群排名</span><strong>${summary.market_rank || '—'}／${summary.industry_rank || '—'}</strong></div></div>` : chipEmpty('這檔股票目前沒有集保資料。')}
+    <div class="chip-two-column">
+      <article><h4>近 9 週籌碼變化</h4><div class="chip-history-chart">${history.map((item) => { const value = Number(item.change_rate); const height = Number.isFinite(value) ? Math.max(3, Math.abs(value) / maxHistory * 100) : 3; return `<div class="chip-history-column"><span class="${toneClassFromNumber(value)}">${formatSignedPercent(value)}</span><i class="${value > 0 ? 'up' : value < 0 ? 'down' : 'flat'}" style="height:${height.toFixed(1)}%"></i><small>${formatYmd(item.data_date).slice(5)}</small></div>`; }).join('')}</div>${payload.history_complete ? '' : '<p class="chip-data-note">歷史資料尚未滿 9 週，畫面顯示目前可取得的週數。</p>'}</article>
+      <article><h4>三大法人近期明細</h4>${institutional.length ? `<div class="chip-table-wrap"><table class="chip-table"><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計／占量比</th></tr></thead><tbody>${institutional.map((row) => `<tr><td>${formatYmd(row.trade_date)}</td><td>${Number(row.foreign_lots).toLocaleString('zh-TW')}</td><td>${Number(row.investment_trust_lots).toLocaleString('zh-TW')}</td><td>${Number(row.dealer_lots).toLocaleString('zh-TW')}</td><td class="${toneClassFromNumber(row.total_lots)}">${Number(row.total_lots).toLocaleString('zh-TW')} 張／${formatSignedPercent(row.volume_ratio)}</td></tr>`).join('')}</tbody></table></div>` : chipEmpty('法人每日快照尚未匯入；不以其他口徑資料替代。')}</article>
+    </div>
+    <article><h4>同族群股票籌碼比較</h4>${renderChipRankingRows(peers, '族群比較需要至少兩週有效集保資料。')}</article>`;
+  mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadChipStock(code) {
+  const mount = document.getElementById('chip-stock-analysis');
+  if (mount) {
+    mount.hidden = false;
+    mount.innerHTML = chipEmpty(`正在載入 ${code} 的近 9 週資料，首次查詢會稍久一些...`);
+  }
+  setStatus('個股籌碼載入中...', 'running');
+  const response = await fetch(`/api/chips/stocks/${encodeURIComponent(code)}`);
+  const payload = await response.json();
+  if (!response.ok || payload.ok === false) throw new Error(payload.error || '個股籌碼載入失敗');
+  renderChipStockAnalysis(payload);
+  setStatus('個股籌碼已載入', 'success');
+}
+
+function bindChipDashboardEvents() {
+  const form = document.getElementById('chip-search-form');
+  const input = document.getElementById('chip-search-input');
+  const suggestions = document.getElementById('chip-search-suggestions');
+  let searchTimer = null;
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (query.length < 2) return;
+    if (/^\d{4}$/.test(query)) { await loadChipStock(query); return; }
+    const response = await fetch(`/api/chips/stocks/search?q=${encodeURIComponent(query)}`);
+    const payload = await response.json();
+    if (payload.items?.[0]) await loadChipStock(payload.items[0].code);
+    else throw new Error('找不到符合的上市／上櫃普通股。');
+  });
+  input?.addEventListener('input', () => {
+    window.clearTimeout(searchTimer);
+    const query = input.value.trim();
+    if (query.length < 2) { suggestions.hidden = true; suggestions.innerHTML = ''; return; }
+    searchTimer = window.setTimeout(async () => {
+      const response = await fetch(`/api/chips/stocks/search?q=${encodeURIComponent(query)}`);
+      const payload = await response.json();
+      suggestions.innerHTML = (payload.items || []).map((item) => `<button type="button" data-chip-suggestion="${escapeHtml(item.code)}"><strong>${escapeHtml(item.code)} ${escapeHtml(item.name)}</strong><span>${escapeHtml(item.market)} · ${escapeHtml(item.industry)}</span></button>`).join('');
+      suggestions.hidden = !payload.items?.length;
+    }, 220);
+  });
+  suggestions?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-chip-suggestion]');
+    if (!button) return;
+    suggestions.hidden = true;
+    input.value = button.dataset.chipSuggestion;
+    loadChipStock(button.dataset.chipSuggestion).catch((error) => setStatus(String(error.message || error), 'failed'));
+  });
+  document.querySelector('.chip-dashboard')?.addEventListener('click', (event) => {
+    const stock = event.target.closest('[data-chip-code]');
+    if (stock) loadChipStock(stock.dataset.chipCode).catch((error) => setStatus(String(error.message || error), 'failed'));
+    const tab = event.target.closest('[data-chip-tab]');
+    if (tab) {
+      document.querySelectorAll('[data-chip-tab]').forEach((item) => item.classList.toggle('active', item === tab));
+      document.querySelector('.chip-ranking-grid')?.setAttribute('data-active-tab', tab.dataset.chipTab);
+    }
+  });
+}
+
+function renderChipDashboard(rankings, industries, featured) {
+  const template = document.getElementById('chip-dashboard-template');
+  elements.latestOutput.className = 'output-box chip-dashboard-output';
+  elements.latestOutput.innerHTML = '';
+  elements.latestOutput.appendChild(template.content.cloneNode(true));
+  document.getElementById('chip-ranking-date').textContent = `資料週 ${formatYmd(rankings.data_date)} · 有效比較母體 ${Number(rankings.comparison_stock_count || 0).toLocaleString('zh-TW')} 檔`;
+  const noRankingMessage = rankings.message || '目前沒有符合條件的股票。';
+  document.getElementById('chip-increase-ranking').innerHTML = renderChipRankingRows(rankings.increase, noRankingMessage);
+  document.getElementById('chip-decrease-ranking').innerHTML = renderChipRankingRows(rankings.decrease, noRankingMessage);
+  document.getElementById('chip-industry-ranking').innerHTML = renderChipIndustryRows(industries.items);
+  document.getElementById('chip-featured-cards').innerHTML = renderChipFeatured(featured.items);
+  bindChipDashboardEvents();
+}
+
+async function loadChipDashboard() {
+  elements.latestMeta.innerHTML = '';
+  elements.artifactList.innerHTML = '';
+  elements.latestOutput.className = 'output-box empty';
+  elements.latestOutput.textContent = '正在同步官方集保與產業資料，首次載入可能需要一些時間...';
+  setStatus('籌碼資料載入中...', 'running');
+  const [rankingsResponse, industriesResponse, featuredResponse] = await Promise.all([
+    fetch('/api/chips/rankings'), fetch('/api/chips/industries'), fetch('/api/chips/featured'),
+  ]);
+  const [rankings, industries, featured] = await Promise.all([
+    rankingsResponse.json(), industriesResponse.json(), featuredResponse.json(),
+  ]);
+  if (!rankingsResponse.ok || !rankings.ok) throw new Error(rankings.error || '排行榜載入失敗');
+  if (!industriesResponse.ok || !industries.ok) throw new Error(industries.error || '族群排名載入失敗');
+  if (!featuredResponse.ok || !featured.ok) throw new Error(featured.error || '熱門股票載入失敗');
+  renderChipDashboard(rankings, industries, featured);
+  elements.latestMeta.innerHTML = `<div class="meta-item">集保資料週：${formatYmd(rankings.data_date)}</div><div class="meta-item">有效比較母體：${Number(rankings.comparison_stock_count || 0).toLocaleString('zh-TW')} 檔</div><div class="meta-item">來源：TDCC 公開資料</div><div class="meta-item">計算版本：${escapeHtml(rankings.calculation_version)}</div>`;
+  setStatus('籌碼儀表板已載入', 'success');
+}
+
 async function loadCurrentResult() {
+  if (isChipDashboardFunction()) {
+    await loadChipDashboard();
+    return;
+  }
+  if (isCustomSectorFunction()) {
+    await loadCustomSectors();
+    return;
+  }
   if (!state.selectedDate) {
     elements.latestOutput.className = 'output-box empty';
     elements.latestOutput.innerHTML = '目前沒有可選日期。';
@@ -2533,6 +2955,28 @@ async function loadCurrentResult() {
   await loadSerenityCache();
 }
 
+async function loadCustomSectors() {
+  if (!state.selectedDate) {
+    elements.latestOutput.className = 'output-box empty';
+    elements.latestOutput.innerHTML = '目前沒有可用交易日。';
+    setStatus('待命', 'neutral');
+    return;
+  }
+
+  elements.latestMeta.innerHTML = '';
+  elements.artifactList.innerHTML = '';
+  elements.latestOutput.className = 'output-box empty';
+  elements.latestOutput.innerHTML = '正在載入自訂股票族群，請稍候...';
+  setStatus('載入自訂族群中...', 'running');
+  const query = new URLSearchParams({ result_date: state.selectedDate });
+  const response = await fetch(`/api/custom_sectors?${query.toString()}`);
+  const payload = await response.json();
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || '讀取自訂股票族群失敗');
+  }
+  renderCustomSectors(payload);
+}
+
 async function loadFearGreedStatus(forceRefresh = false) {
   setStatus(forceRefresh ? '重新抓取情緒指數中...' : '載入情緒指數中...', 'running');
   elements.latestMeta.innerHTML = '';
@@ -2553,8 +2997,16 @@ async function loadFearGreedStatus(forceRefresh = false) {
 }
 
 async function refreshCurrentView() {
+  if (isChipDashboardFunction()) {
+    await loadChipDashboard();
+    return;
+  }
   if (isFearGreedFunction()) {
     await loadFearGreedStatus(true);
+    return;
+  }
+  if (isCustomSectorFunction()) {
+    await loadCustomSectors();
     return;
   }
   await loadCurrentResult();
@@ -2719,11 +3171,11 @@ async function runSerenityAnalysis(forceRefresh = false) {
   );
 
   const progressSteps = [
-    '整理候選股與族群...',
-    '搜尋產業鏈公開資料...',
-    '尋找供應鏈瓶頸...',
-    '比對公司證據與風險...',
-    '產生研究優先順序...',
+    '啟動快速研究代理...',
+    '平行查詢公開資料...',
+    '核對產業鏈與瓶頸證據...',
+    '整理風險與反方條件...',
+    '產生精簡研究報告...',
   ];
   let progressIndex = 0;
   elements.serenityButton.disabled = true;
@@ -2773,7 +3225,10 @@ async function selectFunction(key) {
   if (key === 'new_high_black_volume_contraction' && state.intradayDate) {
     state.selectedDate = state.intradayDate;
     localStorage.setItem('stock-control-date', state.selectedDate);
-  } else if (key !== 'new_high_black_volume_contraction' && state.selectedDate === state.intradayDate) {
+  } else if (key === 'pre_breakout_standard' && state.intradayDate) {
+    state.selectedDate = state.intradayDate;
+    localStorage.setItem('stock-control-date', state.selectedDate);
+  } else if (!isDirectCurrentIntradayFunction(key) && state.selectedDate === state.intradayDate) {
     state.selectedDate = state.dates[0] || '';
     if (state.selectedDate) localStorage.setItem('stock-control-date', state.selectedDate);
   }
@@ -2802,6 +3257,11 @@ async function selectFunction(key) {
 
   if (isFearGreedFunction()) {
     await loadFearGreedStatus();
+    return;
+  }
+
+  if (isCustomSectorFunction()) {
+    await loadCustomSectors();
     return;
   }
 
@@ -2948,6 +3408,11 @@ async function runIntraday() {
     if (!state.currentRun) {
       await loadCurrentResult();
     } else {
+      if (payload.current_intraday) {
+        state.currentRun.current_intraday = true;
+        state.currentRun.result_date = payload.payload?.result_date || state.selectedDate;
+        state.currentRun.status = payload.status;
+      }
       state.currentRun.intraday = {
         status: payload.status,
         payload: payload.payload,
@@ -2983,7 +3448,7 @@ async function loadDatesInBackground() {
     } else {
       setStatus('交易日資料已載入', 'success');
     }
-    if (state.intradayDate && state.selectedKey === 'new_high_black_volume_contraction') {
+    if (state.intradayDate && isDirectCurrentIntradayFunction()) {
       state.selectedDate = state.intradayDate;
       localStorage.setItem('stock-control-date', state.selectedDate);
     } else if (!state.selectedDate || !isSelectableDate(state.selectedDate)) {
@@ -3050,6 +3515,8 @@ async function init() {
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.settingsModal.querySelector('.settings-modal-backdrop').addEventListener('click', closeSettingsModal);
   elements.klineModalClose.addEventListener('click', closeKlineModal);
+  elements.klineSignalDayButton.addEventListener('click', () => renderSignalDayKline());
+  elements.klineTradingViewButton.addEventListener('click', openTradingViewFullChart);
   elements.klineModal.addEventListener('click', (event) => {
     if (event.target.classList.contains('kline-modal-backdrop')) {
       closeKlineModal();

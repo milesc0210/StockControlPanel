@@ -46,11 +46,9 @@ class TradingViewKlineFrontendContractTests(unittest.TestCase):
         self.assertIn("TradingView 元件無法載入，已改用本機 K 線圖", self.source)
 
     def test_chart_load_discards_stale_modal_requests(self):
-        self.assertIn(
-            "lightweightCharts = await loadLightweightCharts();\n      "
-            "if (requestId !== klineRequestSerial || state.currentKlineCode !== code) return;",
-            self.source,
-        )
+        self.assertIn("const lightweightCharts = await loadLightweightCharts();", self.source)
+        self.assertIn("requestId !== klineRequestSerial", self.source)
+        self.assertIn("state.currentKlineCode !== state.currentKlinePayload.code", self.source)
         self.assertIn("TradingView Lightweight Charts 載入逾時", self.source)
 
     def test_static_javascript_keeps_executable_mime_with_nosniff(self):
@@ -83,6 +81,24 @@ class TradingViewKlineFrontendContractTests(unittest.TestCase):
         self.assertIn('payload["ma5"]', self.backend)
         self.assertIn('payload["ma10"]', self.backend)
         self.assertIn('payload["ma20"]', self.backend)
+
+    def test_modal_exposes_signal_day_and_full_tradingview_actions(self):
+        self.assertIn('id="kline-signal-day-button"', self.html)
+        self.assertIn("訊號日 K 線", self.html)
+        self.assertIn('id="kline-tradingview-button"', self.html)
+        self.assertIn("開啟 TradingView 完整圖表", self.html)
+        self.assertIn("klineSignalDayButton", self.source)
+        self.assertIn("klineTradingViewButton", self.source)
+
+    def test_full_tradingview_action_uses_the_stock_market_symbol_url(self):
+        self.assertIn("function openTradingViewFullChart", self.source)
+        self.assertIn("buildTradingViewSymbolUrl(symbol)", self.source)
+        self.assertIn("window.open(url, '_blank', 'noopener,noreferrer')", self.source)
+
+    def test_signal_day_action_renders_the_local_payload(self):
+        self.assertIn("function renderSignalDayKline", self.source)
+        self.assertIn("renderSignalDayKline()", self.source)
+        self.assertIn("renderTradingViewKline(state.currentKlinePayload", self.source)
 
     def test_backend_allows_longer_kline_history(self):
         self.assertIn("find_stock_market(code, end_date, lookback_days)", self.backend)

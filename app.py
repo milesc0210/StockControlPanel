@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -25,6 +27,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from flask import Flask, jsonify, render_template, request
+import requests
+
+import chip_dashboard
 
 BASE_DIR = Path(__file__).resolve().parent
 MILES_AGENT_ROOT = BASE_DIR
@@ -42,6 +47,7 @@ GITHUB_RAW_BASE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{G
 LOCAL_PRESERVE_NAMES = {".env", "stock_control_panel.db", ".git", ".venv", "Release"}
 UPDATE_TRACKED_PATHS = [
     "app.py",
+    "chip_dashboard.py",
     "requirements.txt",
     "README.md",
     "RELEASING.md",
@@ -50,6 +56,7 @@ UPDATE_TRACKED_PATHS = [
     "templates/index.html",
     "static/app.js",
     "static/style.css",
+    "scripts/analyze_012_sector_groups.py",
     "scripts/fetch_klines.py",
     "scripts/analyze_today_limitup_sector_groups.py",
     "scripts/screen_today_limitup.py",
@@ -59,6 +66,7 @@ UPDATE_TRACKED_PATHS = [
     "scripts/analyze_pre_breakout_sector_groups.py",
     "scripts/pre_breakout_backtest.py",
     "scripts/twse_tpex_fetch.py",
+    "scripts/backfill_tdcc_week.py",
 ]
 
 
@@ -109,8 +117,14 @@ INTRADAY_FUNCTION_KEYS = {
     "ma_bullish_turning_point",
     "limit_up_red_arrow",
 }
+DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS = {
+    "new_high_black_volume_contraction",
+    "pre_breakout_standard",
+}
 NEW_HIGH_BLACK_MIN_VOLUME_LOTS = 1000
 FEAR_GREED_FUNCTION_KEY = "cnn_fear_greed_index"
+CUSTOM_SECTOR_FUNCTION_KEY = "custom_stock_sectors"
+CHIP_DASHBOARD_FUNCTION_KEY = "chip_dashboard"
 CNN_FEAR_GREED_URL = "https://www.cnn.com/markets/fear-and-greed"
 CNN_FEAR_GREED_API_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 TW_MM_FEAR_GREED_URL = "https://www.macromicro.me/charts/50108/tw-market-fear-and-greed"
@@ -124,6 +138,12 @@ intraday_quote_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 market_data_sync_lock = threading.Lock()
 fear_greed_cache_lock = threading.Lock()
 kline_cache_lock = threading.Lock()
+chip_dashboard_sync_lock = threading.Lock()
+chip_bundle_imported = False
+chip_stock_history_lock = threading.Lock()
+chip_stock_history_jobs: set[str] = set()
+chip_institutional_job_lock = threading.Lock()
+chip_institutional_job_running = False
 fear_greed_cache_state: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 kline_payload_cache: OrderedDict[tuple[str, str, int], dict[str, Any]] = OrderedDict()
 market_data_sync_state: dict[str, Any] = {
@@ -169,10 +189,24 @@ class FunctionSpec:
 
 FUNCTIONS: list[FunctionSpec] = [
     FunctionSpec(
+        key=CHIP_DASHBOARD_FUNCTION_KEY,
+        name="台股籌碼分析儀表板",
+        category="籌碼分析",
+        description="整合每週集保大戶持股、三大法人與官方產業分類，查看排行榜、9 週趨勢及族群強弱。",
+        executable=False,
+    ),
+    FunctionSpec(
         key=FEAR_GREED_FUNCTION_KEY,
         name="美國 / 台灣 恐懼與貪婪指數",
         category="市場情緒",
         description="同頁查看美國 CNN 與台灣 MM 的恐懼與貪婪指數。",
+        executable=False,
+    ),
+    FunctionSpec(
+        key=CUSTOM_SECTOR_FUNCTION_KEY,
+        name="自訂股票族群",
+        category="自訂功能",
+        description="只顯示主人建立的手動股票族群，每個族群一個區塊。",
         executable=False,
     ),
     FunctionSpec(
@@ -230,6 +264,9 @@ CACHEABLE_FUNCTION_KEYS = {item.key for item in FUNCTIONS if item.executable}
 SERENITY_FUNCTION_KEYS = CACHEABLE_FUNCTION_KEYS
 SERENITY_MAX_STOCKS = 30
 SERENITY_TIMEOUT_SECONDS = 900
+SERENITY_FAST_MAX_TURNS = 12
+SERENITY_FAST_TIMEOUT_SECONDS = 480
+SERENITY_MAX_PARALLEL_WORKERS = 3
 
 
 def resolve_pre_breakout_script() -> Path:
@@ -310,9 +347,10 @@ def fetch_twse_holiday_schedule(year: int) -> list[list[str]]:
         "https://www.twse.com.tw/rwd/zh/holidaySchedule/holidaySchedule"
         f"?response=json&queryYear={year}"
     )
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
+    headers = {"User-Agent": "Mozilla/5.0", "accept": "application/json"}
+    response = requests.get(url, headers=headers, timeout=20)
+    response.raise_for_status()
+    payload = response.json()
     if payload.get("stat") != "ok":
         raise RuntimeError(f"TWSE 行事曆回傳異常：{payload.get('stat')}")
     return payload.get("data", []) or []
@@ -757,6 +795,255 @@ def build_kline_batch_rows(codes: list[str], end_date: str, lookback_days: int =
     return result
 
 
+def load_market(result_date: str) -> dict[str, dict[str, Any]]:
+    """Load one day's TWSE/TPEX rows keyed by stock code.
+
+    The custom-sector page needs the complete manual group membership, not only
+    stocks that pass the MA screen.  This small loader therefore reuses the
+    existing row parsers without applying any screening rule.
+    """
+    result: dict[str, dict[str, Any]] = {}
+    for market in ("twse", "tpex"):
+        path = MILES_AGENT_ROOT / "data" / market / "2026" / f"{result_date}.json"
+        if market == "twse":
+            if not is_valid_twse_file(path):
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            fields = [normalize_field_name(x) for x in payload.get("fields", [])]
+            source_rows = payload.get("data", [])
+            parser = lambda row: parse_twse_stock_row(row, fields)
+        else:
+            if not is_valid_tpex_file(path):
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            table = payload.get("tables", [{}])[0]
+            fields = [normalize_field_name(x) for x in table.get("fields", [])]
+            source_rows = table.get("data", [])
+            parser = lambda row: parse_tpex_stock_row(row, fields)
+
+        for source_row in source_rows:
+            parsed = parser(source_row)
+            if not parsed:
+                continue
+            code, stock = parsed
+            result[code] = {
+                **stock,
+                "code": code,
+                "market": market.upper(),
+                "date": result_date,
+            }
+    return result
+
+
+def load_custom_sector_rules() -> list[tuple[str, set[str]]]:
+    """Return manually maintained sector rules in classifier precedence order."""
+    script_path = SCRIPTS_DIR / "analyze_012_sector_groups.py"
+    module_name = "_stock_control_panel_custom_sector_rules"
+    module_spec = importlib.util.spec_from_file_location(module_name, script_path)
+    if module_spec is None or module_spec.loader is None:
+        raise RuntimeError(f"無法載入自訂族群規則：{script_path}")
+
+    scripts_path = str(SCRIPTS_DIR)
+    path_added = scripts_path not in sys.path
+    if path_added:
+        sys.path.insert(0, scripts_path)
+    try:
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+    finally:
+        if path_added:
+            sys.path.remove(scripts_path)
+
+    rules: list[tuple[str, set[str]]] = []
+    for name, codes in getattr(module, "THEME_RULES", []):
+        normalized_codes = {
+            "".join(ch for ch in str(code).strip() if ch.isdigit())
+            for code in codes
+            if "".join(ch for ch in str(code).strip() if ch.isdigit())
+        }
+        if normalized_codes:
+            rules.append((str(name), normalized_codes))
+    return rules
+
+
+def _custom_sector_number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _custom_sector_rank_score(
+    volume_ratio: float,
+    close_price: float,
+    ma5: float,
+    ma10: float,
+    ma20: float,
+) -> float:
+    """Keep the MA page's score formula for the shared custom-sector columns."""
+    volume_score = min(max(volume_ratio - 1.0, 0.0), 3.0) * 2.0
+    ma_spread_pct = ((ma5 - ma10) + (ma10 - ma20)) / close_price * 100 if close_price > 1e-9 else 0.0
+    spread_score = min(max(ma_spread_pct, 0.0), 5.0) * 1.2
+    return round(4.0 + volume_score + spread_score, 2)
+
+
+def _custom_sector_future_days(
+    rows: list[dict[str, Any]],
+    result_date: str,
+    current_close: float,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    if current_close <= 0:
+        return []
+    ordered_rows = sorted(rows, key=lambda row: str(row.get("date", "")))
+    future_rows = [row for row in ordered_rows if str(row.get("date", "")) > result_date]
+    result: list[dict[str, Any]] = []
+    previous_close = current_close
+    for row in future_rows[:limit]:
+        close = _custom_sector_number(row.get("close"))
+        if close is None or close <= 0:
+            continue
+        result.append(
+            {
+                "date": str(row.get("date", "")),
+                "close": f"{close:.2f}",
+                "pctFromSignal": f"{(close / current_close - 1) * 100:+.2f}%",
+                "pctFromPrev": f"{(close / previous_close - 1) * 100:+.2f}%",
+            }
+        )
+        previous_close = close
+    return result
+
+
+def build_custom_sector_rankings(groups: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
+    """Rank manual groups by the average of their available stock ranking scores."""
+    ranked: list[dict[str, Any]] = []
+    for group_index, group in enumerate(groups):
+        scores = [
+            score
+            for stock in group.get("stocks", [])
+            if (score := _custom_sector_number(stock.get("rankScore"))) is not None
+        ]
+        average_score = round(sum(scores) / len(scores), 2) if scores else None
+        group["averageRankScore"] = average_score
+        if average_score is None:
+            continue
+        ranked.append(
+            {
+                "name": str(group.get("name") or "—"),
+                "averageRankScore": average_score,
+                "count": int(group.get("count") or len(group.get("stocks", []))),
+                "groupIndex": group_index,
+            }
+        )
+
+    ranked.sort(key=lambda item: (-item["averageRankScore"], item["groupIndex"]))
+    for rank, item in enumerate(ranked[:limit], start=1):
+        item["rank"] = rank
+    return ranked[:limit]
+
+
+def build_custom_sector_payload(result_date: str) -> dict[str, Any]:
+    """Build every manual group, retaining the MA page's stock-row fields."""
+    common_dates = valid_shared_dates()
+    if result_date not in common_dates:
+        raise RuntimeError(f"指定日期 {result_date} 不在可用交易日清單內。")
+
+    rules = load_custom_sector_rules()
+    all_codes: list[str] = []
+    seen_codes: set[str] = set()
+    for _, codes in rules:
+        for code in sorted(codes):
+            if code not in seen_codes:
+                seen_codes.add(code)
+                all_codes.append(code)
+
+    date_index = common_dates.index(result_date)
+    future_dates = common_dates[date_index + 1 : date_index + 6]
+    data_end_date = future_dates[-1] if future_dates else result_date
+    lookback_days = 60 if future_dates else 40
+    kline_items = build_kline_batch_rows(all_codes, end_date=data_end_date, lookback_days=lookback_days)
+    market_items = load_market(result_date)
+
+    stock_payloads: dict[str, dict[str, Any]] = {}
+    for code in all_codes:
+        item = kline_items.get(code) or {}
+        market_item = market_items.get(code) or {}
+        rows = sorted(item.get("rows") or [], key=lambda row: str(row.get("date", "")))
+        historical_rows = [row for row in rows if str(row.get("date", "")) <= result_date]
+        current_row = next(
+            (row for row in historical_rows if str(row.get("date", "")) == result_date),
+            None,
+        )
+        if current_row is None and market_item:
+            current_row = {
+                "date": result_date,
+                "open": market_item.get("open"),
+                "high": market_item.get("high"),
+                "low": market_item.get("low"),
+                "close": market_item.get("close"),
+                "volume": market_item.get("volume"),
+            }
+            historical_rows.append(current_row)
+            historical_rows.sort(key=lambda row: str(row.get("date", "")))
+        elif current_row is None and historical_rows:
+            current_row = historical_rows[-1]
+
+        name = str(item.get("name") or market_item.get("name") or "—")
+        market = str(item.get("market") or market_item.get("market") or "—")
+        current_close = _custom_sector_number((current_row or {}).get("close"))
+        current_volume = _custom_sector_number((current_row or {}).get("volume"))
+        previous_row = historical_rows[-2] if len(historical_rows) >= 2 else None
+        previous_volume = _custom_sector_number((previous_row or {}).get("volume"))
+        volume_ratio = current_volume / previous_volume if current_volume is not None and previous_volume and previous_volume > 0 else None
+
+        close_values = [
+            number
+            for number in (_custom_sector_number(row.get("close")) for row in historical_rows)
+            if number is not None
+        ]
+        ma5 = sum(close_values[-5:]) / 5 if len(close_values) >= 5 else None
+        ma10 = sum(close_values[-10:]) / 10 if len(close_values) >= 10 else None
+        ma20 = sum(close_values[-20:]) / 20 if len(close_values) >= 20 else None
+        rank_score = (
+            _custom_sector_rank_score(volume_ratio, current_close, ma5, ma10, ma20)
+            if volume_ratio is not None and current_close and ma5 is not None and ma10 is not None and ma20 is not None
+            else None
+        )
+
+        stock_payloads[code] = {
+            "code": code,
+            "name": name,
+            "market": market,
+            "rankScore": f"{rank_score:.2f}" if rank_score is not None else "",
+            "close": f"{current_close:.2f}" if current_close is not None else "",
+            "volume": str(int(current_volume)) if current_volume is not None else "",
+            "multiple": f"{volume_ratio:.2f}" if volume_ratio is not None else "",
+            "futureDays": _custom_sector_future_days(rows, result_date, current_close or 0.0),
+        }
+
+    groups: list[dict[str, Any]] = []
+    claimed_codes: set[str] = set()
+    for group_name, codes in rules:
+        members = []
+        for code in sorted(codes):
+            if code in claimed_codes:
+                continue
+            claimed_codes.add(code)
+            members.append(stock_payloads[code])
+        groups.append({"name": group_name, "count": len(members), "stocks": members})
+
+    rankings = build_custom_sector_rankings(groups)
+    return {
+        "result_date": result_date,
+        "groups": groups,
+        "rankings": rankings,
+        "group_count": len(groups),
+        "stock_count": sum(group["count"] for group in groups),
+    }
+
+
 def moving_average(values: list[float], period: int) -> list[float | None]:
     result: list[float | None] = []
     for index in range(len(values)):
@@ -852,6 +1139,7 @@ def remember_unavailable_market_date(result_date: str, reason: str) -> None:
 
 def init_db() -> None:
     with get_db() as conn:
+        chip_dashboard.init_schema(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS runs (
@@ -1216,6 +1504,12 @@ def is_intraday_market_open(now: datetime | None = None) -> bool:
     current = now or taipei_now()
     if current.weekday() >= 5:
         return False
+    try:
+        if current.strftime("%Y%m%d") not in trading_dates_for_year(current.year):
+            return False
+    except Exception:
+        # 行事曆無法驗證時採保守策略，不開放盤中功能。
+        return False
     current_time = current.time()
     return dt_time(9, 0) <= current_time <= dt_time(13, 30)
 
@@ -1240,6 +1534,7 @@ def parse_pre_breakout_candidates(output_text: str) -> list[dict[str, str]]:
                 "name": match.group(3),
                 "close": match.group(4),
                 "volume": match.group(5),
+                "rank_score": match.group(6) or "",
             }
         )
     return stocks
@@ -1385,6 +1680,106 @@ def evaluate_new_high_black_intraday(candidate: dict[str, str], quote: dict[str,
     }
 
 
+def evaluate_pre_breakout_intraday(
+    candidate: dict[str, str],
+    quote: dict[str, Any],
+    history_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """用今日即時價量重算標準選股的 A 級盤中條件。"""
+
+    def finite_number(value: Any, *, allow_zero: bool = False) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(number) or number < 0 or (number == 0 and not allow_zero):
+            return None
+        return number
+
+    last_price = finite_number(quote.get("lastPrice"))
+    if last_price is None:
+        last_price = finite_number(quote.get("closePrice"))
+    trade_volume = finite_number((quote.get("total") or {}).get("tradeVolume"), allow_zero=True)
+
+    try:
+        closes = [finite_number(row.get("close")) for row in history_rows]
+        volumes = [finite_number(row.get("volume"), allow_zero=True) for row in history_rows]
+    except AttributeError:
+        closes = []
+        volumes = []
+
+    if (
+        last_price is None
+        or trade_volume is None
+        or len(closes) < 11
+        or any(value is None or value <= 0 for value in closes)
+        or any(value is None or value < 0 for value in volumes)
+    ):
+        return {
+            "matched": False,
+            "last_price": last_price,
+            "trade_volume": trade_volume,
+            "ma5": 0,
+            "ma10": 0,
+            "dist_ma5": 0,
+        }
+
+    numeric_closes = [float(value) for value in closes]
+    numeric_volumes = [float(value) for value in volumes]
+    ma5 = sum(numeric_closes[-5:]) / 5
+    ma5_prev = sum(numeric_closes[-6:-1]) / 5
+    ma10 = sum(numeric_closes[-10:]) / 10
+    previous_close = numeric_closes[-1]
+    pct = (last_price - previous_close) / previous_close * 100 if previous_close > 0 else 0
+
+    range_closes = numeric_closes[-10:]
+    low_10 = min(range_closes)
+    range_pct = (max(range_closes) - low_10) / low_10 * 100 if low_10 > 0 else 0
+    up_days = sum(
+        1
+        for index in range(len(numeric_closes) - 7, len(numeric_closes))
+        if numeric_closes[index] > numeric_closes[index - 1]
+    )
+    avg_vol_10 = sum(numeric_volumes[-10:]) / 10
+    vol_ratio = trade_volume / avg_vol_10 if avg_vol_10 > 0 else 0
+    dist_ma5 = (last_price - ma5) / ma5 * 100 if ma5 > 0 else 0
+    high_40d = max(
+        (float(row.get("high") or 0) for row in history_rows[-40:]),
+        default=0.0,
+    )
+    below_prior_high = abs(pct) < 4 or (high_40d > 0 and last_price < high_40d)
+    candidate_grade = str(candidate.get("grade") or "").strip().upper()
+    matched = (
+        candidate_grade == "A"
+        and last_price >= 10
+        and trade_volume >= 1000
+        and ma5 > ma10
+        and ma5 > ma5_prev
+        and last_price > ma5
+        and abs(pct) < 7
+        and below_prior_high
+        and range_pct < 25
+        and up_days <= 4
+        and dist_ma5 >= 3
+    )
+    return {
+        "matched": matched,
+        "last_price": last_price,
+        "trade_volume": trade_volume,
+        "change_percent": pct,
+        "previous_close": previous_close,
+        "ma5": round(ma5, 4),
+        "ma10": round(ma10, 4),
+        "dist_ma5": round(dist_ma5, 4),
+        "range_pct": round(range_pct, 4),
+        "up_days": up_days,
+        "volume_ratio": round(vol_ratio, 4),
+        "high_40d": round(high_40d, 4),
+    }
+
+
 def parse_intraday_candidates(function_key: str, output_text: str, *, use_watchlist: bool = False) -> list[dict[str, str]]:
     if function_key in PRE_BREAKOUT_FUNCTION_KEYS:
         return parse_pre_breakout_candidates(output_text)
@@ -1423,12 +1818,21 @@ def fetch_fugle_intraday_quote(symbol: str) -> dict[str, Any]:
     return payload
 
 
-def build_intraday_payload(function_key: str, result_date: str, output_text: str) -> tuple[str, dict[str, Any], float]:
+def build_intraday_payload(
+    function_key: str,
+    result_date: str,
+    output_text: str,
+    *,
+    source_result_date: str | None = None,
+    current_intraday: bool = False,
+) -> tuple[str, dict[str, Any], float]:
     if function_key not in INTRADAY_FUNCTION_KEYS:
         raise RuntimeError("這個選股功能目前不支援即時行情。")
+    if current_intraday and function_key not in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS:
+        raise RuntimeError("這個選股功能目前不支援當日盤中直接選股。")
     if function_key == "new_high_black_volume_contraction":
         latest_date = latest_valid_shared_date()
-        if result_date != latest_date and result_date != current_intraday_date():
+        if not current_intraday and result_date != latest_date and result_date != current_intraday_date():
             raise RuntimeError("創高黑量縮只能用最新完整交易日或當日盤中日期查詢。")
     if not is_intraday_market_open():
         raise RuntimeError("目前非盤中時段，即時行情功能暫不啟用。")
@@ -1437,10 +1841,21 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
 
     started_at = taipei_now()
     started_perf = time.perf_counter()
-    use_watchlist = function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date()
+    use_watchlist = function_key == "new_high_black_volume_contraction" and (
+        current_intraday or result_date == current_intraday_date()
+    )
     candidates = parse_intraday_candidates(function_key, output_text, use_watchlist=use_watchlist)
     if not candidates:
         raise RuntimeError("目前結果沒有可查詢的股票清單。")
+
+    history_by_code: dict[str, dict[str, Any]] = {}
+    if current_intraday and function_key == "pre_breakout_standard":
+        history_source_date = source_result_date or latest_valid_shared_date()
+        history_by_code = build_kline_batch_rows(
+            [stock["code"] for stock in candidates],
+            end_date=history_source_date,
+            lookback_days=40,
+        )
 
     quotes: dict[str, Any] = {}
     success_count = 0
@@ -1455,6 +1870,10 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
                 "code": code,
                 "name": stock["name"],
                 "market": stock.get("market", ""),
+                "grade": stock.get("grade", ""),
+                "rank_score": stock.get("rank_score", ""),
+                "close": stock.get("close", ""),
+                "volume": stock.get("volume", ""),
                 "last_price": quote.get("lastPrice") or quote.get("closePrice"),
                 "trade_volume": total.get("tradeVolume"),
                 "change_percent": quote.get("changePercent"),
@@ -1463,6 +1882,15 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
             }
             if function_key == "new_high_black_volume_contraction":
                 condition = evaluate_new_high_black_intraday(stock, quote)
+                quote_payload.update(condition)
+                if condition["matched"]:
+                    matched_count += 1
+            elif current_intraday and function_key == "pre_breakout_standard":
+                condition = evaluate_pre_breakout_intraday(
+                    stock,
+                    quote,
+                    (history_by_code.get(code) or {}).get("rows") or [],
+                )
                 quote_payload.update(condition)
                 if condition["matched"]:
                     matched_count += 1
@@ -1482,13 +1910,20 @@ def build_intraday_payload(function_key: str, result_date: str, output_text: str
         "result_date": result_date,
         "count": len(candidates),
         "success_count": success_count,
-        "matched_count": matched_count if function_key == "new_high_black_volume_contraction" else success_count,
+        "matched_count": (
+            matched_count
+            if function_key == "new_high_black_volume_contraction"
+            or (current_intraday and function_key in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS)
+            else success_count
+        ),
         "quotes": quotes,
         "started_at": started_at.isoformat(timespec="seconds"),
         "finished_at": finished_at.isoformat(timespec="seconds"),
         "quote_date": finished_at.strftime("%Y%m%d"),
         "market_open": True,
     }
+    if source_result_date:
+        payload["source_result_date"] = source_result_date
     status = "success" if success_count > 0 else "failed"
     return status, payload, duration_seconds
 
@@ -1911,7 +2346,13 @@ def normalize_serenity_stocks(raw_stocks: Any) -> list[dict[str, str]]:
     return stocks
 
 
-def build_serenity_prompt(function_name: str, result_date: str, stocks: list[dict[str, str]]) -> str:
+def build_serenity_prompt(
+    function_name: str,
+    result_date: str,
+    stocks: list[dict[str, str]],
+    *,
+    fast: bool = False,
+) -> str:
     date_label = result_date
     if re.fullmatch(r"\d{8}", result_date):
         date_label = f"{result_date[:4]}-{result_date[4:6]}-{result_date[6:]}"
@@ -1933,6 +2374,12 @@ def build_serenity_prompt(function_name: str, result_date: str, stocks: list[dic
         rows.append(f"- {stock['code']} {stock.get('name') or ''}{suffix}".rstrip())
 
     stock_text = "\n".join(rows)
+    if fast:
+        research_instruction = "你是快速研究代理，只分析上方分配給你的股票，不要延伸研究其他股票。必須先實際呼叫 browser_navigate / browser_snapshot 查證最新資料，不可因 web_search 不可用就直接停止分析。每檔最多查 2～3 個可靠公開來源，優先公司 IR、公開資訊觀測站、交易所、Yahoo 股市或 MoneyDJ；不要重複搜尋相同資料。"
+        output_instruction = "請用繁體中文，控制在精簡篇幅，依序輸出：1. 產業鏈位置與瓶頸關聯；2. 具體證據與來源；3. 證據強度；4. 主要風險與反方條件；5. 下一步查證項目。"
+    else:
+        research_instruction = "請使用目前可查到的公開資料，先辨識候選股所屬族群與產業鏈，再找真正難擴產、供應商少、驗證期長或掌握關鍵技術的瓶頸環節。你已獲得 browser 瀏覽器工具。必須先實際呼叫 browser_navigate / browser_snapshot 查證最新資料，不可因 web_search 不可用就直接停止分析。可以用 Bing 搜尋公司代號、公司名稱、月營收、法說會、產能與訂單，再開啟搜尋結果。若個別官網被 Cloudflare 阻擋，請改查公開資訊觀測站、交易所、Yahoo 股市、鉅亨、MoneyDJ 或其他可讀的公開來源，並明確標示來源品質。候選超過 10 檔時，先挑最有瓶頸潛力的 10 檔深入核對，其餘做初步分類。"
+        output_instruction = "請用繁體中文，依序輸出：1. 先講結論與最值得優先研究的產業鏈層級。2. 候選股研究優先順序，逐檔說明產業鏈位置、瓶頸關聯、具體證據、證據強度與主要風險。3. 指出哪些股票可能只是題材沾邊。4. 列出會讓判斷失效的反方條件。5. 給出下一步應查證的公告、月營收、產能、客戶或訂單指標。"
     return f"""請使用 Serenity Skill，針對 StockControlPanel 的選股結果做台股供應鏈深度分析。
 
 選股功能：{function_name}
@@ -1940,21 +2387,19 @@ def build_serenity_prompt(function_name: str, result_date: str, stocks: list[dic
 候選清單：
 {stock_text}
 
-請使用目前可查到的公開資料，先辨識候選股所屬族群與產業鏈，再找真正難擴產、供應商少、驗證期長或掌握關鍵技術的瓶頸環節。
+{research_instruction}
 
-你已獲得 browser 瀏覽器工具。必須先實際呼叫 browser_navigate / browser_snapshot 查證最新資料，不可因 web_search 不可用就直接停止分析。可以用 Bing 搜尋公司代號、公司名稱、月營收、法說會、產能與訂單，再開啟搜尋結果。若個別官網被 Cloudflare 阻擋，請改查公開資訊觀測站、交易所、Yahoo 股市、鉅亨、MoneyDJ 或其他可讀的公開來源，並明確標示來源品質。候選超過 10 檔時，先挑最有瓶頸潛力的 10 檔深入核對，其餘做初步分類。
-
-請用繁體中文，依序輸出：
-1. 先講結論與最值得優先研究的產業鏈層級。
-2. 候選股研究優先順序，逐檔說明產業鏈位置、瓶頸關聯、具體證據、證據強度與主要風險。
-3. 指出哪些股票可能只是題材沾邊。
-4. 列出會讓判斷失效的反方條件。
-5. 給出下一步應查證的公告、月營收、產能、客戶或訂單指標。
+{output_instruction}
 
 這是研究輔助，不要給出保證獲利、直接買進或直接賣出的指令；資料不足時請明確標示尚待查證。"""
 
 
-def run_serenity_cli(prompt: str) -> str:
+def run_serenity_cli(
+    prompt: str,
+    *,
+    max_turns: int = 35,
+    timeout_seconds: int = SERENITY_TIMEOUT_SECONDS,
+) -> str:
     hermes_bin = shutil.which("hermes")
     if not hermes_bin:
         raise RuntimeError("找不到 Hermes CLI。請先安裝並登入 Hermes Agent，再使用 Serenity 深度分析。")
@@ -1966,7 +2411,7 @@ def run_serenity_cli(prompt: str) -> str:
         "--source",
         "tool",
         "--max-turns",
-        "35",
+        str(max_turns),
         "-t",
         "browser,web",
         "-s",
@@ -1986,12 +2431,12 @@ def run_serenity_cli(prompt: str) -> str:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=SERENITY_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
             env=env,
             creationflags=creationflags,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("Serenity 深度分析超過 15 分鐘，請縮小候選清單後再試。") from exc
+        raise RuntimeError(f"Serenity 深度分析超過 {max(1, timeout_seconds // 60)} 分鐘，請縮小候選清單後再試。") from exc
 
     output = (completed.stdout or "").strip()
     if completed.returncode != 0:
@@ -2000,6 +2445,60 @@ def run_serenity_cli(prompt: str) -> str:
     if not output:
         raise RuntimeError("Serenity 沒有回傳分析內容。")
     return output
+
+
+def split_serenity_stocks(stocks: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+    worker_count = min(SERENITY_MAX_PARALLEL_WORKERS, len(stocks))
+    if worker_count <= 1:
+        return [list(stocks)] if stocks else []
+    batches = [[] for _ in range(worker_count)]
+    for index, stock in enumerate(stocks):
+        batches[index % worker_count].append(stock)
+    return [batch for batch in batches if batch]
+
+
+def run_serenity_research(
+    function_name: str,
+    result_date: str,
+    stocks: list[dict[str, str]],
+) -> tuple[str, int, str]:
+    batches = split_serenity_stocks(stocks)
+    if not batches:
+        raise RuntimeError("目前沒有可供 Serenity 分析的股票清單。")
+
+    def run_batch(index: int, batch: list[dict[str, str]]) -> tuple[int, str]:
+        prompt = build_serenity_prompt(function_name, result_date, batch, fast=True)
+        report = run_serenity_cli(
+            prompt,
+            max_turns=SERENITY_FAST_MAX_TURNS,
+            timeout_seconds=SERENITY_FAST_TIMEOUT_SECONDS,
+        )
+        return index, report
+
+    if len(batches) == 1:
+        _, report = run_batch(0, batches[0])
+        return report, 1, "快速單一研究代理"
+
+    reports: dict[int, str] = {}
+    with ThreadPoolExecutor(max_workers=len(batches), thread_name_prefix="serenity-worker") as executor:
+        futures = {
+            executor.submit(run_batch, index, batch): (index, batch)
+            for index, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            index, batch = futures[future]
+            try:
+                _, report = future.result()
+            except Exception as exc:
+                codes = ", ".join(stock["code"] for stock in batch)
+                raise RuntimeError(f"Serenity 平行研究代理（{codes}）失敗：{exc}") from exc
+            reports[index] = report
+
+    sections = []
+    for index, batch in enumerate(batches):
+        codes = ", ".join(stock["code"] for stock in batch)
+        sections.append(f"【平行研究代理 {index + 1}｜{codes}】\n{reports[index]}")
+    return "\n\n".join(sections), len(batches), f"平行快速研究（{len(batches)} 個代理）"
 
 
 def build_local_update_signature() -> str:
@@ -2514,14 +3013,14 @@ def run_function(spec: FunctionSpec, requested_date: str | None = None, skip_cac
     })
 
 
-def run_current_new_high_intraday(
+def run_current_intraday(
     spec: FunctionSpec,
     current_date: str,
     skip_cache: bool = False,
 ) -> dict[str, Any]:
-    """盤中直接執行：以前一完整交易日的創高黑結果作為觀察名單，再查當日即時行情。"""
-    if spec.key != "new_high_black_volume_contraction":
-        raise RuntimeError("只有創高黑量縮支援當日盤中直接選股。")
+    """盤中直接執行：以前一完整交易日結果作為母體，再查當日即時行情。"""
+    if spec.key not in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS:
+        raise RuntimeError("這個選股功能目前不支援當日盤中直接選股。")
     if current_date != current_intraday_date():
         raise RuntimeError("當日盤中直接選股只能在目前交易時段使用。")
 
@@ -2537,6 +3036,8 @@ def run_current_new_high_intraday(
         function_key=spec.key,
         result_date=current_date,
         output_text=base_run["output_text"],
+        source_result_date=source_result_date,
+        current_intraday=True,
     )
     intraday_payload["result_date"] = current_date
     intraday_payload["source_result_date"] = source_result_date
@@ -2562,6 +3063,15 @@ def run_current_new_high_intraday(
         }
     )
     return result
+
+
+def run_current_new_high_intraday(
+    spec: FunctionSpec,
+    current_date: str,
+    skip_cache: bool = False,
+) -> dict[str, Any]:
+    """保留舊函式名稱，讓既有呼叫與測試相容。"""
+    return run_current_intraday(spec, current_date, skip_cache=skip_cache)
 
 
 @app.route("/")
@@ -2598,6 +3108,160 @@ def api_dates() -> Any:
         "intraday_date": current_intraday_date(),
         "sync_status": sync_status,
     })
+
+
+@app.route("/api/custom_sectors")
+def api_custom_sectors() -> Any:
+    result_date = str(request.args.get("result_date") or "").strip()
+    if not re.fullmatch(r"\d{8}", result_date):
+        return jsonify({"ok": False, "error": "交易日期格式錯誤。"}), 400
+    try:
+        return jsonify(build_custom_sector_payload(result_date))
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+def ensure_chip_dashboard_snapshot() -> None:
+    global chip_bundle_imported
+    with chip_dashboard_sync_lock:
+        if not chip_bundle_imported:
+            chip_dashboard.import_local_stock_master(DB_PATH, DATA_ROOT / "chip_stock_master.csv")
+            chip_dashboard.import_local_tdcc_archives(DB_PATH, DATA_ROOT / "tdcc")
+            chip_bundle_imported = True
+        with get_db() as conn:
+            chip_dashboard.init_schema(conn)
+            if chip_dashboard.dashboard_snapshot_ready(conn):
+                return
+        chip_dashboard.sync_latest_snapshot(DB_PATH)
+
+
+def ensure_chip_institutional_snapshot() -> None:
+    trade_dates = valid_shared_dates()
+    if not trade_dates:
+        return
+    chip_dashboard.ensure_institutional_history(DB_PATH, DATA_ROOT, trade_dates)
+
+
+def schedule_chip_institutional_snapshot() -> None:
+    global chip_institutional_job_running
+    with chip_institutional_job_lock:
+        if chip_institutional_job_running:
+            return
+        chip_institutional_job_running = True
+
+    def worker() -> None:
+        global chip_institutional_job_running
+        try:
+            ensure_chip_institutional_snapshot()
+        except Exception:
+            app.logger.exception("法人歷史背景補抓失敗")
+        finally:
+            with chip_institutional_job_lock:
+                chip_institutional_job_running = False
+
+    threading.Thread(
+        target=worker,
+        name="chip-institutional-history",
+        daemon=True,
+    ).start()
+
+
+def chip_stock_history_count(stock_code: str) -> int:
+    with get_db() as conn:
+        return int(
+            conn.execute(
+                "SELECT COUNT(*) FROM chip_weekly_metrics WHERE code=?", (stock_code,)
+            ).fetchone()[0]
+        )
+
+
+def schedule_chip_stock_history(stock_code: str) -> None:
+    with chip_stock_history_lock:
+        if stock_code in chip_stock_history_jobs:
+            return
+        chip_stock_history_jobs.add(stock_code)
+
+    def worker() -> None:
+        try:
+            chip_dashboard.ensure_stock_history(DB_PATH, stock_code, weeks=9)
+        except Exception:
+            app.logger.exception("個股籌碼歷史背景補抓失敗: %s", stock_code)
+        finally:
+            with chip_stock_history_lock:
+                chip_stock_history_jobs.discard(stock_code)
+
+    threading.Thread(
+        target=worker,
+        name=f"chip-history-{stock_code}",
+        daemon=True,
+    ).start()
+
+
+def build_chip_rankings_payload() -> dict[str, Any]:
+    ensure_chip_dashboard_snapshot()
+    market = str(request.args.get("market") or "all").upper()
+    if market not in {"ALL", "TWSE", "TPEX"}:
+        market = "ALL"
+    industry = str(request.args.get("industry") or "").strip()
+    return chip_dashboard.rankings_payload(
+        DB_PATH,
+        market=market.lower() if market == "ALL" else market,
+        industry=industry,
+    )
+
+
+@app.route("/api/chips/rankings")
+def api_chip_rankings() -> Any:
+    try:
+        return jsonify(build_chip_rankings_payload())
+    except Exception as exc:
+        app.logger.exception("籌碼排行榜載入失敗")
+        return jsonify({"ok": False, "error": f"籌碼排行榜載入失敗：{exc}"}), 500
+
+
+@app.route("/api/chips/stocks/search")
+def api_chip_stock_search() -> Any:
+    query = str(request.args.get("q") or "").strip()
+    try:
+        ensure_chip_dashboard_snapshot()
+        return jsonify(chip_dashboard.search_stocks(DB_PATH, query))
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"股票搜尋失敗：{exc}"}), 500
+
+
+@app.route("/api/chips/stocks/<stock_code>")
+def api_chip_stock(stock_code: str) -> Any:
+    if not re.fullmatch(r"\d{4}", stock_code):
+        return jsonify({"ok": False, "error": "股票代號格式錯誤。"}), 400
+    try:
+        ensure_chip_dashboard_snapshot()
+        if chip_stock_history_count(stock_code) < 9:
+            schedule_chip_stock_history(stock_code)
+        schedule_chip_institutional_snapshot()
+        return jsonify(chip_dashboard.stock_payload(DB_PATH, stock_code))
+    except LookupError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("個股籌碼載入失敗: %s", stock_code)
+        return jsonify({"ok": False, "error": f"個股籌碼載入失敗：{exc}"}), 500
+
+
+@app.route("/api/chips/industries")
+def api_chip_industries() -> Any:
+    try:
+        ensure_chip_dashboard_snapshot()
+        return jsonify(chip_dashboard.industries_payload(DB_PATH))
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"族群排名載入失敗：{exc}"}), 500
+
+
+@app.route("/api/chips/featured")
+def api_chip_featured() -> Any:
+    try:
+        ensure_chip_dashboard_snapshot()
+        return jsonify(chip_dashboard.featured_payload(DB_PATH))
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"熱門股票載入失敗：{exc}"}), 500
 
 
 @app.route("/api/market_state")
@@ -2688,10 +3352,13 @@ def api_serenity(function_key: str) -> Any:
         if cached is not None and cached_codes == requested_codes:
             return jsonify(cached)
 
-    prompt = build_serenity_prompt(spec.name, result_date, stocks)
     started = time.perf_counter()
     try:
-        analysis = run_serenity_cli(prompt)
+        analysis, worker_count, research_mode = run_serenity_research(
+            spec.name,
+            result_date,
+            stocks,
+        )
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
@@ -2702,6 +3369,8 @@ def api_serenity(function_key: str) -> Any:
         "result_date": result_date,
         "stock_count": len(stocks),
         "stock_codes": [stock["code"] for stock in stocks],
+        "research_mode": research_mode,
+        "worker_count": worker_count,
         "analysis": analysis,
         "duration_seconds": round(time.perf_counter() - started, 3),
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -2725,9 +3394,9 @@ def api_result() -> Any:
 
 @app.route("/api/kline/<stock_code>")
 def api_kline(stock_code: str) -> Any:
-    end_date = request.args.get("end_date") or latest_valid_shared_date()
-    lookback_days = min(max(int(request.args.get("lookback_days") or 1000), 1), 1000)
     try:
+        end_date = request.args.get("end_date") or latest_valid_shared_date()
+        lookback_days = min(max(int(request.args.get("lookback_days") or 1000), 1), 1000)
         payload = build_full_kline_payload(code=stock_code, end_date=end_date, lookback_days=lookback_days)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
@@ -2738,8 +3407,11 @@ def api_kline(stock_code: str) -> Any:
 def api_kline_batch() -> Any:
     payload = request.get_json(silent=True) or {}
     raw_codes = payload.get("codes") or []
-    end_date = payload.get("end_date") or latest_valid_shared_date()
-    lookback_days = int(payload.get("lookback_days") or 40)
+    try:
+        end_date = payload.get("end_date") or latest_valid_shared_date()
+        lookback_days = min(max(int(payload.get("lookback_days") or 40), 1), 1000)
+    except (TypeError, ValueError, RuntimeError) as exc:
+        return jsonify({"error": str(exc)}), 400
     codes = [str(code).strip() for code in raw_codes if str(code).strip()]
     if not codes:
         return jsonify({"error": "缺少股票代號清單。"}), 400
@@ -2768,8 +3440,8 @@ def api_run(function_key: str) -> Any:
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
     try:
-        if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
-            return jsonify(run_current_new_high_intraday(spec, result_date))
+        if function_key in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS and result_date == current_intraday_date():
+            return jsonify(run_current_intraday(spec, result_date))
         return jsonify(run_function(spec, requested_date=result_date))
     except Exception as exc:
         app.logger.exception("選股功能執行失敗: %s", function_key)
@@ -2787,8 +3459,8 @@ def api_refresh_future(function_key: str) -> Any:
     payload = request.get_json(silent=True) or {}
     result_date = payload.get("result_date")
     try:
-        if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
-            return jsonify(run_current_new_high_intraday(spec, result_date, skip_cache=True))
+        if function_key in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS and result_date == current_intraday_date():
+            return jsonify(run_current_intraday(spec, result_date, skip_cache=True))
         return jsonify(run_function(spec, requested_date=result_date, skip_cache=True))
     except Exception as exc:
         app.logger.exception("強制重跑失敗: %s", function_key)
@@ -2957,8 +3629,12 @@ def api_intraday(function_key: str) -> Any:
     if not is_intraday_market_open():
         return jsonify({"error": "目前非盤中時段，即時行情功能暫不啟用。"}), 400
 
+    current_intraday = (
+        function_key in DIRECT_CURRENT_INTRADAY_FUNCTION_KEYS
+        and result_date == current_intraday_date()
+    )
     source_result_date = result_date
-    if function_key == "new_high_black_volume_contraction" and result_date == current_intraday_date():
+    if current_intraday:
         source_result_date = latest_valid_shared_date()
     cached_run = lookup_cache(function_key, source_result_date)
     if cached_run is None:
@@ -2969,6 +3645,8 @@ def api_intraday(function_key: str) -> Any:
             function_key=function_key,
             result_date=result_date,
             output_text=cached_run["output_text"],
+            source_result_date=source_result_date if current_intraday else None,
+            current_intraday=current_intraday,
         )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
@@ -2982,6 +3660,7 @@ def api_intraday(function_key: str) -> Any:
             "finished_at": intraday_payload["finished_at"],
             "duration_seconds": duration_seconds,
             "from_cache": False,
+            "current_intraday": current_intraday,
         }
     )
 
